@@ -218,8 +218,6 @@ fn orphans(frame: &mut Frame, diagnostics: &mut Vec<Diagnostic>) {
 /// Parses CWT, retaining recoverable diagnostics and partial nodes instead of hiding unparsed input.
 pub fn parse(source: &str, file: &str) -> Document {
     let (tokens, lexical_error) = tokenize(source, file);
-    let mut cursor = Cursor::new(tokens);
-    let mut frames = vec![Frame::root()];
     let mut diagnostics = Vec::new();
     if let Some(e) = lexical_error {
         diagnostics.push(Diagnostic {
@@ -228,12 +226,24 @@ pub fn parse(source: &str, file: &str) -> Document {
             message: e.message,
         });
     }
+    let nodes = parse_tokens(tokens, source, &mut diagnostics);
+    diagnostics.sort_by_key(|d| (d.span.start, d.kind.clone()));
+    Document {
+        file: file.into(),
+        nodes,
+        diagnostics,
+    }
+}
+
+fn parse_tokens(tokens: Vec<Token>, source: &str, diagnostics: &mut Vec<Diagnostic>) -> Vec<Node> {
+    let mut cursor = Cursor::new(tokens);
+    let mut frames = vec![Frame::root()];
     while let Some(token) = cursor.take() {
         let frame = frames.last_mut().expect("root");
         match token {
             Token::Annotation(a) => frame.annotations.push(a),
             Token::Close(close) => {
-                orphans(frame, &mut diagnostics);
+                orphans(frame, diagnostics);
                 if frames.len() == 1 {
                     diagnostics.push(Diagnostic {
                         kind: "syntax".into(),
@@ -275,7 +285,7 @@ pub fn parse(source: &str, file: &str) -> Document {
                                     span: start,
                                     message: "Missing assignment value".into(),
                                 });
-                                orphans(frame, &mut diagnostics);
+                                orphans(frame, diagnostics);
                                 continue;
                             }
                         }
@@ -323,9 +333,17 @@ pub fn parse(source: &str, file: &str) -> Document {
             }
         }
     }
+    finish_frames(frames, source, diagnostics)
+}
+
+fn finish_frames(
+    mut frames: Vec<Frame>,
+    source: &str,
+    diagnostics: &mut Vec<Diagnostic>,
+) -> Vec<Node> {
     while frames.len() > 1 {
         let mut child = frames.pop().expect("child");
-        orphans(&mut child, &mut diagnostics);
+        orphans(&mut child, diagnostics);
         diagnostics.push(Diagnostic {
             kind: "syntax".into(),
             span: Span {
@@ -342,11 +360,6 @@ pub fn parse(source: &str, file: &str) -> Document {
         }));
     }
     let mut root = frames.pop().expect("root");
-    orphans(&mut root, &mut diagnostics);
-    diagnostics.sort_by_key(|d| (d.span.start, d.kind.clone()));
-    Document {
-        file: file.into(),
-        nodes: root.nodes,
-        diagnostics,
-    }
+    orphans(&mut root, diagnostics);
+    root.nodes
 }

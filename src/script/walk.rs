@@ -36,6 +36,33 @@ pub fn item_children(item: &Item, regions: RegionPolicy<'_>) -> Result<Vec<Item>
     })
 }
 /// Pre-order traversal with child context, subtree skipping, and early termination. Returns whether stopped.
+///
+/// The context returned by a visitor applies to its children, not to its siblings.
+/// Entry values are visited as separate items without source metadata.
+/// `RegionPolicy::Read` visits verbatim regions as flat items and can return a syntax error.
+///
+/// ```
+/// use pdxscript::script::{parse, walk_items, ItemKind, RegionPolicy, WalkControl};
+///
+/// let document = parse("ignored = { x = 1 } target = 2 later = 3", "example.txt")?;
+/// let mut visited_depths = Vec::new();
+/// let stopped = walk_items(
+///     &document.items,
+///     0,
+///     |item, depth| {
+///         visited_depths.push(*depth);
+///         match &item.kind {
+///             ItemKind::Entry(entry) if entry.key == "ignored" => WalkControl::Skip,
+///             ItemKind::Scalar(_) => WalkControl::Stop,
+///             _ => WalkControl::Continue(depth + 1),
+///         }
+///     },
+///     RegionPolicy::Skip, // Leave any verbatim region bodies uninterpreted.
+/// )?;
+/// assert!(stopped); // Stopped at the target's scalar value, before visiting `later`.
+/// assert_eq!(visited_depths, vec![0, 0, 1]);
+/// # Ok::<(), pdxscript::SyntaxError>(())
+/// ```
 pub fn walk_items<C: Clone>(
     items: &[Item],
     context: C,

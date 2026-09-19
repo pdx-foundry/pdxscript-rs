@@ -11,11 +11,28 @@ fn body(container: &Container) -> Json {
     value
 }
 pub fn items(nodes: &[Item]) -> Vec<Json> {
-    nodes.iter().map(|item| match &item.kind {
-        ItemKind::Scalar(s) => scalar(s),
-        ItemKind::Container(c) => body(c),
-        ItemKind::Entry(e) => json!({"kind":"entry","key":e.key,"op":e.op,"value":match &e.value { Value::Scalar(s) => scalar(s), Value::Container(c) => body(c) }}),
-        ItemKind::Param { name, negated, items: children } => json!({"kind":"param","name":name,"negated":negated,"items":items(children)}),
-        ItemKind::ParamText { name, negated, text } => json!({"kind":"param-text","name":name,"negated":negated,"text":text}),
-    }).collect()
+    nodes
+        .iter()
+        .map(|item| match &item.kind {
+            ItemKind::Scalar(s) => scalar(s),
+            ItemKind::Container(c) => body(c),
+            ItemKind::Entry(entry) => {
+                let value = match &entry.value {
+                    Value::Scalar(scalar_value) => scalar(scalar_value),
+                    Value::Container(container) => body(container),
+                };
+                json!({"kind":"entry","key":entry.key,"op":entry.op,"value":value})
+            }
+            ItemKind::Param {
+                name,
+                negated,
+                items: children,
+            } => json!({"kind":"param","name":name,"negated":negated,"items":items(children)}),
+            ItemKind::ParamText {
+                name,
+                negated,
+                text,
+            } => json!({"kind":"param-text","name":name,"negated":negated,"text":text}),
+        })
+        .collect()
 }
