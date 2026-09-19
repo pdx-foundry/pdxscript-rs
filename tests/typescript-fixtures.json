@@ -1,0 +1,2783 @@
+{
+  "sourceRevision": "400e92f00afb524371198bedd4f9cddfcab48f78",
+  "cases": [
+    {
+      "source": "﻿a = 1",
+      "file": "parser.test.ts:0",
+      "expected": {
+        "items": [
+          {
+            "kind": "entry",
+            "key": "a",
+            "op": "=",
+            "value": {
+              "kind": "num",
+              "lexeme": "1"
+            }
+          }
+        ],
+        "canonical": "a = 1\n",
+        "diagnostics": []
+      }
+    },
+    {
+      "source": "[[X]﻿a = 1 ]",
+      "file": "parser.test.ts:1",
+      "expected": {
+        "items": [
+          {
+            "kind": "param",
+            "name": "X",
+            "negated": false,
+            "items": [
+              {
+                "kind": "entry",
+                "key": "﻿a",
+                "op": "=",
+                "value": {
+                  "kind": "num",
+                  "lexeme": "1"
+                }
+              }
+            ]
+          }
+        ],
+        "canonical": "[[X]\n\t\"﻿a\" = 1\n]\n",
+        "diagnostics": []
+      }
+    },
+    {
+      "source": "[[X]﻿a = {\n]",
+      "file": "parser.test.ts:2",
+      "expected": {
+        "items": [
+          {
+            "kind": "param-text",
+            "name": "X",
+            "negated": false,
+            "text": "﻿a = {\n"
+          }
+        ],
+        "canonical": "[[X]﻿a = {\n]\n",
+        "diagnostics": []
+      }
+    },
+    {
+      "source": "a = ﻿foo",
+      "file": "parser.test.ts:3",
+      "expected": {
+        "items": [
+          {
+            "kind": "entry",
+            "key": "a",
+            "op": "=",
+            "value": {
+              "kind": "str",
+              "value": "﻿foo",
+              "quoted": false
+            }
+          }
+        ],
+        "canonical": "a = ﻿foo\n",
+        "diagnostics": []
+      }
+    },
+    {
+      "source": "a = 1\n﻿b = 2",
+      "file": "parser.test.ts:4",
+      "expected": {
+        "items": [
+          {
+            "kind": "entry",
+            "key": "a",
+            "op": "=",
+            "value": {
+              "kind": "num",
+              "lexeme": "1"
+            }
+          },
+          {
+            "kind": "entry",
+            "key": "﻿b",
+            "op": "=",
+            "value": {
+              "kind": "num",
+              "lexeme": "2"
+            }
+          }
+        ],
+        "canonical": "a = 1\n\n\"﻿b\" = 2\n",
+        "diagnostics": []
+      }
+    },
+    {
+      "source": "a = 1 # trailing\n# whole line\nb = 2",
+      "file": "parser.test.ts:5",
+      "expected": {
+        "items": [
+          {
+            "kind": "entry",
+            "key": "a",
+            "op": "=",
+            "value": {
+              "kind": "num",
+              "lexeme": "1"
+            }
+          },
+          {
+            "kind": "entry",
+            "key": "b",
+            "op": "=",
+            "value": {
+              "kind": "num",
+              "lexeme": "2"
+            }
+          }
+        ],
+        "canonical": "a = 1\n\nb = 2\n",
+        "diagnostics": []
+      }
+    },
+    {
+      "source": "foo=abc#def\nbar=qux",
+      "file": "parser.test.ts:6",
+      "expected": {
+        "items": [
+          {
+            "kind": "entry",
+            "key": "foo",
+            "op": "=",
+            "value": {
+              "kind": "str",
+              "value": "abc",
+              "quoted": false
+            }
+          },
+          {
+            "kind": "entry",
+            "key": "bar",
+            "op": "=",
+            "value": {
+              "kind": "str",
+              "value": "qux",
+              "quoted": false
+            }
+          }
+        ],
+        "canonical": "foo = abc\n\nbar = qux\n",
+        "diagnostics": []
+      }
+    },
+    {
+      "source": "foo = a\n# bee",
+      "file": "parser.test.ts:7",
+      "expected": {
+        "items": [
+          {
+            "kind": "entry",
+            "key": "foo",
+            "op": "=",
+            "value": {
+              "kind": "str",
+              "value": "a",
+              "quoted": false
+            }
+          }
+        ],
+        "canonical": "foo = a\n",
+        "diagnostics": []
+      }
+    },
+    {
+      "source": "﻿#hello",
+      "file": "parser.test.ts:8",
+      "expected": {
+        "items": [],
+        "canonical": "\n",
+        "diagnostics": []
+      }
+    },
+    {
+      "source": "a = 1;; b = 2;",
+      "file": "parser.test.ts:9",
+      "expected": {
+        "items": [
+          {
+            "kind": "entry",
+            "key": "a",
+            "op": "=",
+            "value": {
+              "kind": "num",
+              "lexeme": "1"
+            }
+          },
+          {
+            "kind": "entry",
+            "key": "b",
+            "op": "=",
+            "value": {
+              "kind": "num",
+              "lexeme": "2"
+            }
+          }
+        ],
+        "canonical": "a = 1\n\nb = 2\n",
+        "diagnostics": []
+      }
+    },
+    {
+      "source": "a = 1\nb = {\n\tc = 2\n}\n",
+      "file": "parser.test.ts:10",
+      "expected": {
+        "items": [
+          {
+            "kind": "entry",
+            "key": "a",
+            "op": "=",
+            "value": {
+              "kind": "num",
+              "lexeme": "1"
+            }
+          },
+          {
+            "kind": "entry",
+            "key": "b",
+            "op": "=",
+            "value": {
+              "kind": "container",
+              "items": [
+                {
+                  "kind": "entry",
+                  "key": "c",
+                  "op": "=",
+                  "value": {
+                    "kind": "num",
+                    "lexeme": "2"
+                  }
+                }
+              ]
+            }
+          }
+        ],
+        "canonical": "a = 1\n\nb = {\n\tc = 2\n}\n",
+        "diagnostics": []
+      }
+    },
+    {
+      "source": "a = 1\r\nb = {\r\n\tc = 2\r\n}\r\n",
+      "file": "parser.test.ts:11",
+      "expected": {
+        "items": [
+          {
+            "kind": "entry",
+            "key": "a",
+            "op": "=",
+            "value": {
+              "kind": "num",
+              "lexeme": "1"
+            }
+          },
+          {
+            "kind": "entry",
+            "key": "b",
+            "op": "=",
+            "value": {
+              "kind": "container",
+              "items": [
+                {
+                  "kind": "entry",
+                  "key": "c",
+                  "op": "=",
+                  "value": {
+                    "kind": "num",
+                    "lexeme": "2"
+                  }
+                }
+              ]
+            }
+          }
+        ],
+        "canonical": "a = 1\n\nb = {\n\tc = 2\n}\n",
+        "diagnostics": []
+      }
+    },
+    {
+      "source": "name = \"Joe \\\"Captain\\\" Rogers\"",
+      "file": "parser.test.ts:12",
+      "expected": {
+        "items": [
+          {
+            "kind": "entry",
+            "key": "name",
+            "op": "=",
+            "value": {
+              "kind": "str",
+              "value": "Joe \\\"Captain\\\" Rogers",
+              "quoted": true
+            }
+          }
+        ],
+        "canonical": "name = \"Joe \\\"Captain\\\" Rogers\"\n",
+        "diagnostics": []
+      }
+    },
+    {
+      "source": "a = \"line one\nline\ttwo\"",
+      "file": "parser.test.ts:13",
+      "expected": {
+        "items": [
+          {
+            "kind": "entry",
+            "key": "a",
+            "op": "=",
+            "value": {
+              "kind": "str",
+              "value": "line one\nline\ttwo",
+              "quoted": true
+            }
+          }
+        ],
+        "canonical": "a = \"line one\nline\ttwo\"\n",
+        "diagnostics": []
+      }
+    },
+    {
+      "source": "a = \"oops",
+      "file": "parser.test.ts:14",
+      "expected": {
+        "error": true,
+        "line": 1
+      }
+    },
+    {
+      "source": "\n\na = \"oops",
+      "file": "parser.test.ts:15",
+      "expected": {
+        "error": true,
+        "line": 3
+      }
+    },
+    {
+      "source": "$PLAYER_COUNTRY$? = { x = 1 }",
+      "file": "parser.test.ts:16",
+      "expected": {
+        "items": [
+          {
+            "kind": "entry",
+            "key": "$PLAYER_COUNTRY$?",
+            "op": "=",
+            "value": {
+              "kind": "container",
+              "items": [
+                {
+                  "kind": "entry",
+                  "key": "x",
+                  "op": "=",
+                  "value": {
+                    "kind": "num",
+                    "lexeme": "1"
+                  }
+                }
+              ]
+            }
+          }
+        ],
+        "canonical": "$PLAYER_COUNTRY$? = {\n\tx = 1\n}\n",
+        "diagnostics": []
+      }
+    },
+    {
+      "source": "a = @tier3cost1",
+      "file": "parser.test.ts:17",
+      "expected": {
+        "items": [
+          {
+            "kind": "entry",
+            "key": "a",
+            "op": "=",
+            "value": {
+              "kind": "var",
+              "name": "@tier3cost1"
+            }
+          }
+        ],
+        "canonical": "a = @tier3cost1\n",
+        "diagnostics": []
+      }
+    },
+    {
+      "source": "pos = @[ 1 - leopard_x ]",
+      "file": "parser.test.ts:18",
+      "expected": {
+        "items": [
+          {
+            "kind": "entry",
+            "key": "pos",
+            "op": "=",
+            "value": {
+              "kind": "math",
+              "source": "@[ 1 - leopard_x ]"
+            }
+          }
+        ],
+        "canonical": "pos = @[ 1 - leopard_x ]\n",
+        "diagnostics": []
+      }
+    },
+    {
+      "source": "a = @[ 1 -",
+      "file": "parser.test.ts:19",
+      "expected": {
+        "error": true,
+        "line": 1
+      }
+    },
+    {
+      "source": "v = @\\[( 72 * $PROGRESS$ )]",
+      "file": "parser.test.ts:20",
+      "expected": {
+        "items": [
+          {
+            "kind": "entry",
+            "key": "v",
+            "op": "=",
+            "value": {
+              "kind": "math",
+              "source": "@\\[( 72 * $PROGRESS$ )]"
+            }
+          }
+        ],
+        "canonical": "v = @\\[( 72 * $PROGRESS$ )]\n",
+        "diagnostics": []
+      }
+    },
+    {
+      "source": "a={b}",
+      "file": "parser.test.ts:21",
+      "expected": {
+        "items": [
+          {
+            "kind": "entry",
+            "key": "a",
+            "op": "=",
+            "value": {
+              "kind": "container",
+              "items": [
+                {
+                  "kind": "str",
+                  "value": "b",
+                  "quoted": false
+                }
+              ]
+            }
+          }
+        ],
+        "canonical": "a = { b }\n",
+        "diagnostics": []
+      }
+    },
+    {
+      "source": "\"foo\"=\"bar\"3=\"1444.11.11\"",
+      "file": "parser.test.ts:22",
+      "expected": {
+        "items": [
+          {
+            "kind": "entry",
+            "key": "foo",
+            "op": "=",
+            "value": {
+              "kind": "str",
+              "value": "bar",
+              "quoted": true
+            }
+          },
+          {
+            "kind": "entry",
+            "key": "3",
+            "op": "=",
+            "value": {
+              "kind": "str",
+              "value": "1444.11.11",
+              "quoted": true
+            }
+          }
+        ],
+        "canonical": "foo = \"bar\"\n\n3 = \"1444.11.11\"\n",
+        "diagnostics": []
+      }
+    },
+    {
+      "source": "mult = value:job_weights_research_modifier|JOB|head_researcher|",
+      "file": "parser.test.ts:23",
+      "expected": {
+        "items": [
+          {
+            "kind": "entry",
+            "key": "mult",
+            "op": "=",
+            "value": {
+              "kind": "str",
+              "value": "value:job_weights_research_modifier|JOB|head_researcher|",
+              "quoted": false
+            }
+          }
+        ],
+        "canonical": "mult = value:job_weights_research_modifier|JOB|head_researcher|\n",
+        "diagnostics": []
+      }
+    },
+    {
+      "source": "t = scope:attacker.primary_title.tier",
+      "file": "parser.test.ts:24",
+      "expected": {
+        "items": [
+          {
+            "kind": "entry",
+            "key": "t",
+            "op": "=",
+            "value": {
+              "kind": "str",
+              "value": "scope:attacker.primary_title.tier",
+              "quoted": false
+            }
+          }
+        ],
+        "canonical": "t = scope:attacker.primary_title.tier\n",
+        "diagnostics": []
+      }
+    },
+    {
+      "source": "dashed-identifier = yes",
+      "file": "parser.test.ts:25",
+      "expected": {
+        "items": [
+          {
+            "kind": "entry",
+            "key": "dashed-identifier",
+            "op": "=",
+            "value": {
+              "kind": "bool",
+              "value": true
+            }
+          }
+        ],
+        "canonical": "dashed-identifier = yes\n",
+        "diagnostics": []
+      }
+    },
+    {
+      "source": "jean_jaurès = bar",
+      "file": "parser.test.ts:26",
+      "expected": {
+        "items": [
+          {
+            "kind": "entry",
+            "key": "jean_jaurès",
+            "op": "=",
+            "value": {
+              "kind": "str",
+              "value": "bar",
+              "quoted": false
+            }
+          }
+        ],
+        "canonical": "jean_jaurès = bar\n",
+        "diagnostics": []
+      }
+    },
+    {
+      "source": "b = 1\n\na = 2",
+      "file": "parser.test.ts:27",
+      "expected": {
+        "items": [
+          {
+            "kind": "entry",
+            "key": "b",
+            "op": "=",
+            "value": {
+              "kind": "num",
+              "lexeme": "1"
+            }
+          },
+          {
+            "kind": "entry",
+            "key": "a",
+            "op": "=",
+            "value": {
+              "kind": "num",
+              "lexeme": "2"
+            }
+          }
+        ],
+        "canonical": "b = 1\n\na = 2\n",
+        "diagnostics": []
+      }
+    },
+    {
+      "source": "food\nminerals\nenergy",
+      "file": "parser.test.ts:28",
+      "expected": {
+        "items": [
+          {
+            "kind": "str",
+            "value": "food",
+            "quoted": false
+          },
+          {
+            "kind": "str",
+            "value": "minerals",
+            "quoted": false
+          },
+          {
+            "kind": "str",
+            "value": "energy",
+            "quoted": false
+          }
+        ],
+        "canonical": "food\n\nminerals\n\nenergy\n",
+        "diagnostics": []
+      }
+    },
+    {
+      "source": "{\tcategories = { x }\n}",
+      "file": "parser.test.ts:29",
+      "expected": {
+        "items": [
+          {
+            "kind": "container",
+            "items": [
+              {
+                "kind": "entry",
+                "key": "categories",
+                "op": "=",
+                "value": {
+                  "kind": "container",
+                  "items": [
+                    {
+                      "kind": "str",
+                      "value": "x",
+                      "quoted": false
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ],
+        "canonical": "{\n\tcategories = { x }\n}\n",
+        "diagnostics": []
+      }
+    },
+    {
+      "source": "m = 1\nm = 2\nm = 3",
+      "file": "parser.test.ts:30",
+      "expected": {
+        "items": [
+          {
+            "kind": "entry",
+            "key": "m",
+            "op": "=",
+            "value": {
+              "kind": "num",
+              "lexeme": "1"
+            }
+          },
+          {
+            "kind": "entry",
+            "key": "m",
+            "op": "=",
+            "value": {
+              "kind": "num",
+              "lexeme": "2"
+            }
+          },
+          {
+            "kind": "entry",
+            "key": "m",
+            "op": "=",
+            "value": {
+              "kind": "num",
+              "lexeme": "3"
+            }
+          }
+        ],
+        "canonical": "m = 1\n\nm = 2\n\nm = 3\n",
+        "diagnostics": []
+      }
+    },
+    {
+      "source": "limit = { has_level >= 2 count < 5 }",
+      "file": "parser.test.ts:31",
+      "expected": {
+        "items": [
+          {
+            "kind": "entry",
+            "key": "limit",
+            "op": "=",
+            "value": {
+              "kind": "container",
+              "items": [
+                {
+                  "kind": "entry",
+                  "key": "has_level",
+                  "op": ">=",
+                  "value": {
+                    "kind": "num",
+                    "lexeme": "2"
+                  }
+                },
+                {
+                  "kind": "entry",
+                  "key": "count",
+                  "op": "<",
+                  "value": {
+                    "kind": "num",
+                    "lexeme": "5"
+                  }
+                }
+              ]
+            }
+          }
+        ],
+        "canonical": "limit = {\n\thas_level >= 2\n\tcount < 5\n}\n",
+        "diagnostics": []
+      }
+    },
+    {
+      "source": "@tier3cost1 = 4000",
+      "file": "parser.test.ts:32",
+      "expected": {
+        "items": [
+          {
+            "kind": "entry",
+            "key": "@tier3cost1",
+            "op": "=",
+            "value": {
+              "kind": "num",
+              "lexeme": "4000"
+            }
+          }
+        ],
+        "canonical": "@tier3cost1 = 4000\n",
+        "diagnostics": []
+      }
+    },
+    {
+      "source": "\"key\" = 1",
+      "file": "parser.test.ts:33",
+      "expected": {
+        "items": [
+          {
+            "kind": "entry",
+            "key": "key",
+            "op": "=",
+            "value": {
+              "kind": "num",
+              "lexeme": "1"
+            }
+          }
+        ],
+        "canonical": "key = 1\n",
+        "diagnostics": []
+      }
+    },
+    {
+      "source": "a = 1\nb = {\n\tc = 2\n}",
+      "file": "parser.test.ts:34",
+      "expected": {
+        "items": [
+          {
+            "kind": "entry",
+            "key": "a",
+            "op": "=",
+            "value": {
+              "kind": "num",
+              "lexeme": "1"
+            }
+          },
+          {
+            "kind": "entry",
+            "key": "b",
+            "op": "=",
+            "value": {
+              "kind": "container",
+              "items": [
+                {
+                  "kind": "entry",
+                  "key": "c",
+                  "op": "=",
+                  "value": {
+                    "kind": "num",
+                    "lexeme": "2"
+                  }
+                }
+              ]
+            }
+          }
+        ],
+        "canonical": "a = 1\n\nb = {\n\tc = 2\n}\n",
+        "diagnostics": []
+      }
+    },
+    {
+      "source": "a =",
+      "file": "parser.test.ts:35",
+      "expected": {
+        "error": true,
+        "line": 1
+      }
+    },
+    {
+      "source": "b = { a = }",
+      "file": "parser.test.ts:36",
+      "expected": {
+        "error": true,
+        "line": 1
+      }
+    },
+    {
+      "source": "a = yes",
+      "file": "parser.test.ts:37",
+      "expected": {
+        "items": [
+          {
+            "kind": "entry",
+            "key": "a",
+            "op": "=",
+            "value": {
+              "kind": "bool",
+              "value": true
+            }
+          }
+        ],
+        "canonical": "a = yes\n",
+        "diagnostics": []
+      }
+    },
+    {
+      "source": "a = no",
+      "file": "parser.test.ts:38",
+      "expected": {
+        "items": [
+          {
+            "kind": "entry",
+            "key": "a",
+            "op": "=",
+            "value": {
+              "kind": "bool",
+              "value": false
+            }
+          }
+        ],
+        "canonical": "a = no\n",
+        "diagnostics": []
+      }
+    },
+    {
+      "source": "a = \"yes\"",
+      "file": "parser.test.ts:39",
+      "expected": {
+        "items": [
+          {
+            "kind": "entry",
+            "key": "a",
+            "op": "=",
+            "value": {
+              "kind": "str",
+              "value": "yes",
+              "quoted": true
+            }
+          }
+        ],
+        "canonical": "a = \"yes\"\n",
+        "diagnostics": []
+      }
+    },
+    {
+      "source": "a = 3",
+      "file": "parser.test.ts:40",
+      "expected": {
+        "items": [
+          {
+            "kind": "entry",
+            "key": "a",
+            "op": "=",
+            "value": {
+              "kind": "num",
+              "lexeme": "3"
+            }
+          }
+        ],
+        "canonical": "a = 3\n",
+        "diagnostics": []
+      }
+    },
+    {
+      "source": "a = 0.25",
+      "file": "parser.test.ts:41",
+      "expected": {
+        "items": [
+          {
+            "kind": "entry",
+            "key": "a",
+            "op": "=",
+            "value": {
+              "kind": "num",
+              "lexeme": "0.25"
+            }
+          }
+        ],
+        "canonical": "a = 0.25\n",
+        "diagnostics": []
+      }
+    },
+    {
+      "source": "a = -1.5",
+      "file": "parser.test.ts:42",
+      "expected": {
+        "items": [
+          {
+            "kind": "entry",
+            "key": "a",
+            "op": "=",
+            "value": {
+              "kind": "num",
+              "lexeme": "-1.5"
+            }
+          }
+        ],
+        "canonical": "a = -1.5\n",
+        "diagnostics": []
+      }
+    },
+    {
+      "source": "a = .5",
+      "file": "parser.test.ts:43",
+      "expected": {
+        "items": [
+          {
+            "kind": "entry",
+            "key": "a",
+            "op": "=",
+            "value": {
+              "kind": "num",
+              "lexeme": "0.5"
+            }
+          }
+        ],
+        "canonical": "a = 0.5\n",
+        "diagnostics": []
+      }
+    },
+    {
+      "source": "pop_happiness = +0.10",
+      "file": "parser.test.ts:44",
+      "expected": {
+        "items": [
+          {
+            "kind": "entry",
+            "key": "pop_happiness",
+            "op": "=",
+            "value": {
+              "kind": "num",
+              "lexeme": "0.1"
+            }
+          }
+        ],
+        "canonical": "pop_happiness = 0.1\n",
+        "diagnostics": []
+      }
+    },
+    {
+      "source": "min = -0",
+      "file": "parser.test.ts:45",
+      "expected": {
+        "items": [
+          {
+            "kind": "entry",
+            "key": "min",
+            "op": "=",
+            "value": {
+              "kind": "num",
+              "lexeme": "0"
+            }
+          }
+        ],
+        "canonical": "min = 0\n",
+        "diagnostics": []
+      }
+    },
+    {
+      "source": "x = 9007199254740993",
+      "file": "parser.test.ts:46",
+      "expected": {
+        "items": [
+          {
+            "kind": "entry",
+            "key": "x",
+            "op": "=",
+            "value": {
+              "kind": "num",
+              "lexeme": "9007199254740993"
+            }
+          }
+        ],
+        "canonical": "x = 9007199254740993\n",
+        "diagnostics": []
+      }
+    },
+    {
+      "source": "x = 9007199254740993",
+      "file": "parser.test.ts:47",
+      "expected": {
+        "items": [
+          {
+            "kind": "entry",
+            "key": "x",
+            "op": "=",
+            "value": {
+              "kind": "num",
+              "lexeme": "9007199254740993"
+            }
+          }
+        ],
+        "canonical": "x = 9007199254740993\n",
+        "diagnostics": []
+      }
+    },
+    {
+      "source": "x = 1000000000000000000000",
+      "file": "parser.test.ts:48",
+      "expected": {
+        "items": [
+          {
+            "kind": "entry",
+            "key": "x",
+            "op": "=",
+            "value": {
+              "kind": "num",
+              "lexeme": "1000000000000000000000"
+            }
+          }
+        ],
+        "canonical": "x = 1000000000000000000000\n",
+        "diagnostics": []
+      }
+    },
+    {
+      "source": "x = 0.0000001",
+      "file": "parser.test.ts:49",
+      "expected": {
+        "items": [
+          {
+            "kind": "entry",
+            "key": "x",
+            "op": "=",
+            "value": {
+              "kind": "num",
+              "lexeme": "0.0000001"
+            }
+          }
+        ],
+        "canonical": "x = 0.0000001\n",
+        "diagnostics": []
+      }
+    },
+    {
+      "source": "a = 2200.01.01",
+      "file": "parser.test.ts:50",
+      "expected": {
+        "items": [
+          {
+            "kind": "entry",
+            "key": "a",
+            "op": "=",
+            "value": {
+              "kind": "str",
+              "value": "2200.01.01",
+              "quoted": false
+            }
+          }
+        ],
+        "canonical": "a = 2200.01.01\n",
+        "diagnostics": []
+      }
+    },
+    {
+      "source": "cost = @t3cost",
+      "file": "parser.test.ts:51",
+      "expected": {
+        "items": [
+          {
+            "kind": "entry",
+            "key": "cost",
+            "op": "=",
+            "value": {
+              "kind": "var",
+              "name": "@t3cost"
+            }
+          }
+        ],
+        "canonical": "cost = @t3cost\n",
+        "diagnostics": []
+      }
+    },
+    {
+      "source": "a = tech_lasers",
+      "file": "parser.test.ts:52",
+      "expected": {
+        "items": [
+          {
+            "kind": "entry",
+            "key": "a",
+            "op": "=",
+            "value": {
+              "kind": "str",
+              "value": "tech_lasers",
+              "quoted": false
+            }
+          }
+        ],
+        "canonical": "a = tech_lasers\n",
+        "diagnostics": []
+      }
+    },
+    {
+      "source": "category = { biology industry }",
+      "file": "parser.test.ts:53",
+      "expected": {
+        "items": [
+          {
+            "kind": "entry",
+            "key": "category",
+            "op": "=",
+            "value": {
+              "kind": "container",
+              "items": [
+                {
+                  "kind": "str",
+                  "value": "biology",
+                  "quoted": false
+                },
+                {
+                  "kind": "str",
+                  "value": "industry",
+                  "quoted": false
+                }
+              ]
+            }
+          }
+        ],
+        "canonical": "category = { biology industry }\n",
+        "diagnostics": []
+      }
+    },
+    {
+      "source": "a = { b = 1 c = 2 }",
+      "file": "parser.test.ts:54",
+      "expected": {
+        "items": [
+          {
+            "kind": "entry",
+            "key": "a",
+            "op": "=",
+            "value": {
+              "kind": "container",
+              "items": [
+                {
+                  "kind": "entry",
+                  "key": "b",
+                  "op": "=",
+                  "value": {
+                    "kind": "num",
+                    "lexeme": "1"
+                  }
+                },
+                {
+                  "kind": "entry",
+                  "key": "c",
+                  "op": "=",
+                  "value": {
+                    "kind": "num",
+                    "lexeme": "2"
+                  }
+                }
+              ]
+            }
+          }
+        ],
+        "canonical": "a = {\n\tb = 1\n\tc = 2\n}\n",
+        "diagnostics": []
+      }
+    },
+    {
+      "source": "prerequisites = { tech_stingers OR = { tech_a tech_b } }",
+      "file": "parser.test.ts:55",
+      "expected": {
+        "items": [
+          {
+            "kind": "entry",
+            "key": "prerequisites",
+            "op": "=",
+            "value": {
+              "kind": "container",
+              "items": [
+                {
+                  "kind": "str",
+                  "value": "tech_stingers",
+                  "quoted": false
+                },
+                {
+                  "kind": "entry",
+                  "key": "OR",
+                  "op": "=",
+                  "value": {
+                    "kind": "container",
+                    "items": [
+                      {
+                        "kind": "str",
+                        "value": "tech_a",
+                        "quoted": false
+                      },
+                      {
+                        "kind": "str",
+                        "value": "tech_b",
+                        "quoted": false
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        ],
+        "canonical": "prerequisites = {\n\ttech_stingers\n\tOR = { tech_a tech_b }\n}\n",
+        "diagnostics": []
+      }
+    },
+    {
+      "source": "dlc = { name = \"x\" paradoxplaza_store_url \"\" show = no }",
+      "file": "parser.test.ts:56",
+      "expected": {
+        "items": [
+          {
+            "kind": "entry",
+            "key": "dlc",
+            "op": "=",
+            "value": {
+              "kind": "container",
+              "items": [
+                {
+                  "kind": "entry",
+                  "key": "name",
+                  "op": "=",
+                  "value": {
+                    "kind": "str",
+                    "value": "x",
+                    "quoted": true
+                  }
+                },
+                {
+                  "kind": "str",
+                  "value": "paradoxplaza_store_url",
+                  "quoted": false
+                },
+                {
+                  "kind": "str",
+                  "value": "",
+                  "quoted": true
+                },
+                {
+                  "kind": "entry",
+                  "key": "show",
+                  "op": "=",
+                  "value": {
+                    "kind": "bool",
+                    "value": false
+                  }
+                }
+              ]
+            }
+          }
+        ],
+        "canonical": "dlc = {\n\tname = \"x\"\n\tparadoxplaza_store_url\n\t\"\"\n\tshow = no\n}\n",
+        "diagnostics": []
+      }
+    },
+    {
+      "source": "a = {}",
+      "file": "parser.test.ts:57",
+      "expected": {
+        "items": [
+          {
+            "kind": "entry",
+            "key": "a",
+            "op": "=",
+            "value": {
+              "kind": "container",
+              "items": []
+            }
+          }
+        ],
+        "canonical": "a = {}\n",
+        "diagnostics": []
+      }
+    },
+    {
+      "source": "h = { {} {} }",
+      "file": "parser.test.ts:58",
+      "expected": {
+        "items": [
+          {
+            "kind": "entry",
+            "key": "h",
+            "op": "=",
+            "value": {
+              "kind": "container",
+              "items": [
+                {
+                  "kind": "container",
+                  "items": []
+                },
+                {
+                  "kind": "container",
+                  "items": []
+                }
+              ]
+            }
+          }
+        ],
+        "canonical": "h = {\n\t{}\n\t{}\n}\n",
+        "diagnostics": []
+      }
+    },
+    {
+      "source": "a = { b = { c = { d = 1 } } }",
+      "file": "parser.test.ts:59",
+      "expected": {
+        "items": [
+          {
+            "kind": "entry",
+            "key": "a",
+            "op": "=",
+            "value": {
+              "kind": "container",
+              "items": [
+                {
+                  "kind": "entry",
+                  "key": "b",
+                  "op": "=",
+                  "value": {
+                    "kind": "container",
+                    "items": [
+                      {
+                        "kind": "entry",
+                        "key": "c",
+                        "op": "=",
+                        "value": {
+                          "kind": "container",
+                          "items": [
+                            {
+                              "kind": "entry",
+                              "key": "d",
+                              "op": "=",
+                              "value": {
+                                "kind": "num",
+                                "lexeme": "1"
+                              }
+                            }
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        ],
+        "canonical": "a = {\n\tb = {\n\t\tc = {\n\t\t\td = 1\n\t\t}\n\t}\n}\n",
+        "diagnostics": []
+      }
+    },
+    {
+      "source": "p = { { 0 1 } { 2 3 } }",
+      "file": "parser.test.ts:60",
+      "expected": {
+        "items": [
+          {
+            "kind": "entry",
+            "key": "p",
+            "op": "=",
+            "value": {
+              "kind": "container",
+              "items": [
+                {
+                  "kind": "container",
+                  "items": [
+                    {
+                      "kind": "num",
+                      "lexeme": "0"
+                    },
+                    {
+                      "kind": "num",
+                      "lexeme": "1"
+                    }
+                  ]
+                },
+                {
+                  "kind": "container",
+                  "items": [
+                    {
+                      "kind": "num",
+                      "lexeme": "2"
+                    },
+                    {
+                      "kind": "num",
+                      "lexeme": "3"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ],
+        "canonical": "p = {\n\t{ 0 1 }\n\t{ 2 3 }\n}\n",
+        "diagnostics": []
+      }
+    },
+    {
+      "source": "color = rgb { 100 200 150 10 }",
+      "file": "parser.test.ts:61",
+      "expected": {
+        "items": [
+          {
+            "kind": "entry",
+            "key": "color",
+            "op": "=",
+            "value": {
+              "kind": "container",
+              "header": "rgb",
+              "items": [
+                {
+                  "kind": "num",
+                  "lexeme": "100"
+                },
+                {
+                  "kind": "num",
+                  "lexeme": "200"
+                },
+                {
+                  "kind": "num",
+                  "lexeme": "150"
+                },
+                {
+                  "kind": "num",
+                  "lexeme": "10"
+                }
+              ]
+            }
+          }
+        ],
+        "canonical": "color = rgb { 100 200 150 10 }\n",
+        "diagnostics": []
+      }
+    },
+    {
+      "source": "name = rgb\ntype = 4713",
+      "file": "parser.test.ts:62",
+      "expected": {
+        "items": [
+          {
+            "kind": "entry",
+            "key": "name",
+            "op": "=",
+            "value": {
+              "kind": "str",
+              "value": "rgb",
+              "quoted": false
+            }
+          },
+          {
+            "kind": "entry",
+            "key": "type",
+            "op": "=",
+            "value": {
+              "kind": "num",
+              "lexeme": "4713"
+            }
+          }
+        ],
+        "canonical": "name = rgb\n\ntype = 4713\n",
+        "diagnostics": []
+      }
+    },
+    {
+      "source": "m = { foo\n{ 1 2 } }",
+      "file": "parser.test.ts:63",
+      "expected": {
+        "items": [
+          {
+            "kind": "entry",
+            "key": "m",
+            "op": "=",
+            "value": {
+              "kind": "container",
+              "items": [
+                {
+                  "kind": "str",
+                  "value": "foo",
+                  "quoted": false
+                },
+                {
+                  "kind": "container",
+                  "items": [
+                    {
+                      "kind": "num",
+                      "lexeme": "1"
+                    },
+                    {
+                      "kind": "num",
+                      "lexeme": "2"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ],
+        "canonical": "m = {\n\tfoo\n\t{ 1 2 }\n}\n",
+        "diagnostics": []
+      }
+    },
+    {
+      "source": "e = { [[POP_GROUP] $POP_GROUP$ = { x = 1 } ] [[!POP_GROUP] y = 2 ] }",
+      "file": "parser.test.ts:64",
+      "expected": {
+        "items": [
+          {
+            "kind": "entry",
+            "key": "e",
+            "op": "=",
+            "value": {
+              "kind": "container",
+              "items": [
+                {
+                  "kind": "param",
+                  "name": "POP_GROUP",
+                  "negated": false,
+                  "items": [
+                    {
+                      "kind": "entry",
+                      "key": "$POP_GROUP$",
+                      "op": "=",
+                      "value": {
+                        "kind": "container",
+                        "items": [
+                          {
+                            "kind": "entry",
+                            "key": "x",
+                            "op": "=",
+                            "value": {
+                              "kind": "num",
+                              "lexeme": "1"
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                },
+                {
+                  "kind": "param",
+                  "name": "POP_GROUP",
+                  "negated": true,
+                  "items": [
+                    {
+                      "kind": "entry",
+                      "key": "y",
+                      "op": "=",
+                      "value": {
+                        "kind": "num",
+                        "lexeme": "2"
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ],
+        "canonical": "e = {\n\t[[POP_GROUP]\n\t\t$POP_GROUP$ = {\n\t\t\tx = 1\n\t\t}\n\t]\n\t[[!POP_GROUP]\n\t\ty = 2\n\t]\n}\n",
+        "diagnostics": []
+      }
+    },
+    {
+      "source": "e = { [[X] $X$ = yes ] }",
+      "file": "parser.test.ts:65",
+      "expected": {
+        "items": [
+          {
+            "kind": "entry",
+            "key": "e",
+            "op": "=",
+            "value": {
+              "kind": "container",
+              "items": [
+                {
+                  "kind": "param",
+                  "name": "X",
+                  "negated": false,
+                  "items": [
+                    {
+                      "kind": "entry",
+                      "key": "$X$",
+                      "op": "=",
+                      "value": {
+                        "kind": "bool",
+                        "value": true
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ],
+        "canonical": "e = {\n\t[[X]\n\t\t$X$ = yes\n\t]\n}\n",
+        "diagnostics": []
+      }
+    },
+    {
+      "source": "e = { [[X] a = 1 ] }",
+      "file": "parser.test.ts:66",
+      "expected": {
+        "items": [
+          {
+            "kind": "entry",
+            "key": "e",
+            "op": "=",
+            "value": {
+              "kind": "container",
+              "items": [
+                {
+                  "kind": "param",
+                  "name": "X",
+                  "negated": false,
+                  "items": [
+                    {
+                      "kind": "entry",
+                      "key": "a",
+                      "op": "=",
+                      "value": {
+                        "kind": "num",
+                        "lexeme": "1"
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ],
+        "canonical": "e = {\n\t[[X]\n\t\ta = 1\n\t]\n}\n",
+        "diagnostics": []
+      }
+    },
+    {
+      "source": "e = { [[two words] a = 1 ] }",
+      "file": "parser.test.ts:67",
+      "expected": {
+        "error": true,
+        "line": 1
+      }
+    },
+    {
+      "source": "e = { [[X] a = 1",
+      "file": "parser.test.ts:68",
+      "expected": {
+        "error": true,
+        "line": 1
+      }
+    },
+    {
+      "source": "e = { [[X",
+      "file": "parser.test.ts:69",
+      "expected": {
+        "error": true,
+        "line": 1
+      }
+    },
+    {
+      "source": "e = { [[X] [[Y] a = 1 ] b = 2 ] }",
+      "file": "parser.test.ts:70",
+      "expected": {
+        "items": [
+          {
+            "kind": "entry",
+            "key": "e",
+            "op": "=",
+            "value": {
+              "kind": "container",
+              "items": [
+                {
+                  "kind": "param",
+                  "name": "X",
+                  "negated": false,
+                  "items": [
+                    {
+                      "kind": "param",
+                      "name": "Y",
+                      "negated": false,
+                      "items": [
+                        {
+                          "kind": "entry",
+                          "key": "a",
+                          "op": "=",
+                          "value": {
+                            "kind": "num",
+                            "lexeme": "1"
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "kind": "entry",
+                      "key": "b",
+                      "op": "=",
+                      "value": {
+                        "kind": "num",
+                        "lexeme": "2"
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ],
+        "canonical": "e = {\n\t[[X]\n\t\t[[Y]\n\t\t\ta = 1\n\t\t]\n\t\tb = 2\n\t]\n}\n",
+        "diagnostics": []
+      }
+    },
+    {
+      "source": "a = 1\ne = {\n\t[[X]\n\t\tb = 2\n\t]\n}",
+      "file": "parser.test.ts:71",
+      "expected": {
+        "items": [
+          {
+            "kind": "entry",
+            "key": "a",
+            "op": "=",
+            "value": {
+              "kind": "num",
+              "lexeme": "1"
+            }
+          },
+          {
+            "kind": "entry",
+            "key": "e",
+            "op": "=",
+            "value": {
+              "kind": "container",
+              "items": [
+                {
+                  "kind": "param",
+                  "name": "X",
+                  "negated": false,
+                  "items": [
+                    {
+                      "kind": "entry",
+                      "key": "b",
+                      "op": "=",
+                      "value": {
+                        "kind": "num",
+                        "lexeme": "2"
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ],
+        "canonical": "a = 1\n\ne = {\n\t[[X]\n\t\tb = 2\n\t]\n}\n",
+        "diagnostics": []
+      }
+    },
+    {
+      "source": "e = { [[X] a = { ] }",
+      "file": "parser.test.ts:72",
+      "expected": {
+        "items": [
+          {
+            "kind": "entry",
+            "key": "e",
+            "op": "=",
+            "value": {
+              "kind": "container",
+              "items": [
+                {
+                  "kind": "param-text",
+                  "name": "X",
+                  "negated": false,
+                  "text": " a = { "
+                }
+              ]
+            }
+          }
+        ],
+        "canonical": "e = {\n\t[[X] a = { ]\n}\n",
+        "diagnostics": []
+      }
+    },
+    {
+      "source": "e = { [[X] a = @dist { ] }",
+      "file": "parser.test.ts:73",
+      "expected": {
+        "items": [
+          {
+            "kind": "entry",
+            "key": "e",
+            "op": "=",
+            "value": {
+              "kind": "container",
+              "items": [
+                {
+                  "kind": "param-text",
+                  "name": "X",
+                  "negated": false,
+                  "text": " a = @dist { "
+                }
+              ]
+            }
+          }
+        ],
+        "canonical": "e = {\n\t[[X] a = @dist { ]\n}\n",
+        "diagnostics": []
+      }
+    },
+    {
+      "source": "e = { [[X] a # @not_a_ref\n[[Y] b ] { ] }",
+      "file": "parser.test.ts:74",
+      "expected": {
+        "items": [
+          {
+            "kind": "entry",
+            "key": "e",
+            "op": "=",
+            "value": {
+              "kind": "container",
+              "items": [
+                {
+                  "kind": "param-text",
+                  "name": "X",
+                  "negated": false,
+                  "text": " a # @not_a_ref\n[[Y] b ] { "
+                }
+              ]
+            }
+          }
+        ],
+        "canonical": "e = {\n\t[[X] a # @not_a_ref\n[[Y] b ] { ]\n}\n",
+        "diagnostics": []
+      }
+    },
+    {
+      "source": "color = { 121 163 114 } } army_names = { \"Armata\" }",
+      "file": "parser.test.ts:75",
+      "expected": {
+        "items": [
+          {
+            "kind": "entry",
+            "key": "color",
+            "op": "=",
+            "value": {
+              "kind": "container",
+              "items": [
+                {
+                  "kind": "num",
+                  "lexeme": "121"
+                },
+                {
+                  "kind": "num",
+                  "lexeme": "163"
+                },
+                {
+                  "kind": "num",
+                  "lexeme": "114"
+                }
+              ]
+            }
+          },
+          {
+            "kind": "entry",
+            "key": "army_names",
+            "op": "=",
+            "value": {
+              "kind": "container",
+              "items": [
+                {
+                  "kind": "str",
+                  "value": "Armata",
+                  "quoted": true
+                }
+              ]
+            }
+          }
+        ],
+        "canonical": "color = { 121 163 114 }\n\narmy_names = { \"Armata\" }\n",
+        "diagnostics": [
+          {
+            "kind": "stray-closing-brace",
+            "line": 1,
+            "text": "}"
+          }
+        ]
+      }
+    },
+    {
+      "source": "names = {\n\tordered = { 1 = { x = 1 } }",
+      "file": "parser.test.ts:76",
+      "expected": {
+        "items": [
+          {
+            "kind": "entry",
+            "key": "names",
+            "op": "=",
+            "value": {
+              "kind": "container",
+              "items": [
+                {
+                  "kind": "entry",
+                  "key": "ordered",
+                  "op": "=",
+                  "value": {
+                    "kind": "container",
+                    "items": [
+                      {
+                        "kind": "entry",
+                        "key": "1",
+                        "op": "=",
+                        "value": {
+                          "kind": "container",
+                          "items": [
+                            {
+                              "kind": "entry",
+                              "key": "x",
+                              "op": "=",
+                              "value": {
+                                "kind": "num",
+                                "lexeme": "1"
+                              }
+                            }
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        ],
+        "canonical": "names = {\n\tordered = {\n\t\t1 = {\n\t\t\tx = 1\n\t\t}\n\t}\n}\n",
+        "diagnostics": [
+          {
+            "kind": "unclosed-at-eof",
+            "line": 1,
+            "text": "{"
+          }
+        ]
+      }
+    },
+    {
+      "source": "foo{bar=qux}",
+      "file": "parser.test.ts:77",
+      "expected": {
+        "items": [
+          {
+            "kind": "entry",
+            "key": "foo",
+            "op": "=",
+            "value": {
+              "kind": "container",
+              "items": [
+                {
+                  "kind": "entry",
+                  "key": "bar",
+                  "op": "=",
+                  "value": {
+                    "kind": "str",
+                    "value": "qux",
+                    "quoted": false
+                  }
+                }
+              ]
+            }
+          }
+        ],
+        "canonical": "foo = {\n\tbar = qux\n}\n",
+        "diagnostics": [
+          {
+            "kind": "operator-less-entry",
+            "line": 1,
+            "text": "foo"
+          }
+        ]
+      }
+    },
+    {
+      "source": "foo = { bar = qux }",
+      "file": "parser.test.ts:78",
+      "expected": {
+        "items": [
+          {
+            "kind": "entry",
+            "key": "foo",
+            "op": "=",
+            "value": {
+              "kind": "container",
+              "items": [
+                {
+                  "kind": "entry",
+                  "key": "bar",
+                  "op": "=",
+                  "value": {
+                    "kind": "str",
+                    "value": "qux",
+                    "quoted": false
+                  }
+                }
+              ]
+            }
+          }
+        ],
+        "canonical": "foo = {\n\tbar = qux\n}\n",
+        "diagnostics": []
+      }
+    },
+    {
+      "source": "icons = { spriteType { name = GFX_checkmark_icon } }",
+      "file": "parser.test.ts:79",
+      "expected": {
+        "items": [
+          {
+            "kind": "entry",
+            "key": "icons",
+            "op": "=",
+            "value": {
+              "kind": "container",
+              "items": [
+                {
+                  "kind": "entry",
+                  "key": "spriteType",
+                  "op": "=",
+                  "value": {
+                    "kind": "container",
+                    "items": [
+                      {
+                        "kind": "entry",
+                        "key": "name",
+                        "op": "=",
+                        "value": {
+                          "kind": "str",
+                          "value": "GFX_checkmark_icon",
+                          "quoted": false
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        ],
+        "canonical": "icons = {\n\tspriteType = {\n\t\tname = GFX_checkmark_icon\n\t}\n}\n",
+        "diagnostics": [
+          {
+            "kind": "operator-less-entry",
+            "line": 1,
+            "text": "spriteType"
+          }
+        ]
+      }
+    },
+    {
+      "source": "icons = { spriteType = { name = GFX_checkmark_icon } }",
+      "file": "parser.test.ts:80",
+      "expected": {
+        "items": [
+          {
+            "kind": "entry",
+            "key": "icons",
+            "op": "=",
+            "value": {
+              "kind": "container",
+              "items": [
+                {
+                  "kind": "entry",
+                  "key": "spriteType",
+                  "op": "=",
+                  "value": {
+                    "kind": "container",
+                    "items": [
+                      {
+                        "kind": "entry",
+                        "key": "name",
+                        "op": "=",
+                        "value": {
+                          "kind": "str",
+                          "value": "GFX_checkmark_icon",
+                          "quoted": false
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        ],
+        "canonical": "icons = {\n\tspriteType = {\n\t\tname = GFX_checkmark_icon\n\t}\n}\n",
+        "diagnostics": []
+      }
+    },
+    {
+      "source": "icons = { spriteType { name = GFX_checkmark_icon } }",
+      "file": "parser.test.ts:81",
+      "expected": {
+        "items": [
+          {
+            "kind": "entry",
+            "key": "icons",
+            "op": "=",
+            "value": {
+              "kind": "container",
+              "items": [
+                {
+                  "kind": "entry",
+                  "key": "spriteType",
+                  "op": "=",
+                  "value": {
+                    "kind": "container",
+                    "items": [
+                      {
+                        "kind": "entry",
+                        "key": "name",
+                        "op": "=",
+                        "value": {
+                          "kind": "str",
+                          "value": "GFX_checkmark_icon",
+                          "quoted": false
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        ],
+        "canonical": "icons = {\n\tspriteType = {\n\t\tname = GFX_checkmark_icon\n\t}\n}\n",
+        "diagnostics": [
+          {
+            "kind": "operator-less-entry",
+            "line": 1,
+            "text": "spriteType"
+          }
+        ]
+      }
+    },
+    {
+      "source": "a = { b = 1 }",
+      "file": "parser.test.ts:82",
+      "expected": {
+        "items": [
+          {
+            "kind": "entry",
+            "key": "a",
+            "op": "=",
+            "value": {
+              "kind": "container",
+              "items": [
+                {
+                  "kind": "entry",
+                  "key": "b",
+                  "op": "=",
+                  "value": {
+                    "kind": "num",
+                    "lexeme": "1"
+                  }
+                }
+              ]
+            }
+          }
+        ],
+        "canonical": "a = {\n\tb = 1\n}\n",
+        "diagnostics": []
+      }
+    },
+    {
+      "source": "p = { tech_a OR = { x y } }",
+      "file": "parser.test.ts:83",
+      "expected": {
+        "items": [
+          {
+            "kind": "entry",
+            "key": "p",
+            "op": "=",
+            "value": {
+              "kind": "container",
+              "items": [
+                {
+                  "kind": "str",
+                  "value": "tech_a",
+                  "quoted": false
+                },
+                {
+                  "kind": "entry",
+                  "key": "OR",
+                  "op": "=",
+                  "value": {
+                    "kind": "container",
+                    "items": [
+                      {
+                        "kind": "str",
+                        "value": "x",
+                        "quoted": false
+                      },
+                      {
+                        "kind": "str",
+                        "value": "y",
+                        "quoted": false
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        ],
+        "canonical": "p = {\n\ttech_a\n\tOR = { x y }\n}\n",
+        "diagnostics": []
+      }
+    },
+    {
+      "source": "a = @[\n x\n]\nb = 1",
+      "file": "parser.test.ts:84",
+      "expected": {
+        "items": [
+          {
+            "kind": "entry",
+            "key": "a",
+            "op": "=",
+            "value": {
+              "kind": "math",
+              "source": "@[\n x\n]"
+            }
+          },
+          {
+            "kind": "entry",
+            "key": "b",
+            "op": "=",
+            "value": {
+              "kind": "num",
+              "lexeme": "1"
+            }
+          }
+        ],
+        "canonical": "a = @[\n x\n]\n\nb = 1\n",
+        "diagnostics": []
+      }
+    },
+    {
+      "source": "color = hsv { 0.63 0.13 0.5 }",
+      "file": "parser.test.ts:85",
+      "expected": {
+        "items": [
+          {
+            "kind": "entry",
+            "key": "color",
+            "op": "=",
+            "value": {
+              "kind": "container",
+              "header": "hsv",
+              "items": [
+                {
+                  "kind": "num",
+                  "lexeme": "0.63"
+                },
+                {
+                  "kind": "num",
+                  "lexeme": "0.13"
+                },
+                {
+                  "kind": "num",
+                  "lexeme": "0.5"
+                }
+              ]
+            }
+          }
+        ],
+        "canonical": "color = hsv { 0.63 0.13 0.5 }\n",
+        "diagnostics": []
+      }
+    },
+    {
+      "source": "\"two words\" = 1",
+      "file": "parser.test.ts:86",
+      "expected": {
+        "items": [
+          {
+            "kind": "entry",
+            "key": "two words",
+            "op": "=",
+            "value": {
+              "kind": "num",
+              "lexeme": "1"
+            }
+          }
+        ],
+        "canonical": "\"two words\" = 1\n",
+        "diagnostics": []
+      }
+    },
+    {
+      "source": "\"﻿key\" = 1",
+      "file": "parser.test.ts:87",
+      "expected": {
+        "items": [
+          {
+            "kind": "entry",
+            "key": "﻿key",
+            "op": "=",
+            "value": {
+              "kind": "num",
+              "lexeme": "1"
+            }
+          }
+        ],
+        "canonical": "\"﻿key\" = 1\n",
+        "diagnostics": []
+      }
+    },
+    {
+      "source": "\"﻿key\" = 1",
+      "file": "parser.test.ts:88",
+      "expected": {
+        "items": [
+          {
+            "kind": "entry",
+            "key": "﻿key",
+            "op": "=",
+            "value": {
+              "kind": "num",
+              "lexeme": "1"
+            }
+          }
+        ],
+        "canonical": "\"﻿key\" = 1\n",
+        "diagnostics": []
+      }
+    },
+    {
+      "source": "a = 1\n\"﻿b\" = 2",
+      "file": "parser.test.ts:89",
+      "expected": {
+        "items": [
+          {
+            "kind": "entry",
+            "key": "a",
+            "op": "=",
+            "value": {
+              "kind": "num",
+              "lexeme": "1"
+            }
+          },
+          {
+            "kind": "entry",
+            "key": "﻿b",
+            "op": "=",
+            "value": {
+              "kind": "num",
+              "lexeme": "2"
+            }
+          }
+        ],
+        "canonical": "a = 1\n\n\"﻿b\" = 2\n",
+        "diagnostics": []
+      }
+    },
+    {
+      "source": "a = 1\nb = { c d }\ne = { f = 2 g { 1 2 } }",
+      "file": "parser.test.ts:90",
+      "expected": {
+        "items": [
+          {
+            "kind": "entry",
+            "key": "a",
+            "op": "=",
+            "value": {
+              "kind": "num",
+              "lexeme": "1"
+            }
+          },
+          {
+            "kind": "entry",
+            "key": "b",
+            "op": "=",
+            "value": {
+              "kind": "container",
+              "items": [
+                {
+                  "kind": "str",
+                  "value": "c",
+                  "quoted": false
+                },
+                {
+                  "kind": "str",
+                  "value": "d",
+                  "quoted": false
+                }
+              ]
+            }
+          },
+          {
+            "kind": "entry",
+            "key": "e",
+            "op": "=",
+            "value": {
+              "kind": "container",
+              "items": [
+                {
+                  "kind": "entry",
+                  "key": "f",
+                  "op": "=",
+                  "value": {
+                    "kind": "num",
+                    "lexeme": "2"
+                  }
+                },
+                {
+                  "kind": "str",
+                  "value": "g",
+                  "quoted": false
+                },
+                {
+                  "kind": "container",
+                  "items": [
+                    {
+                      "kind": "num",
+                      "lexeme": "1"
+                    },
+                    {
+                      "kind": "num",
+                      "lexeme": "2"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ],
+        "canonical": "a = 1\n\nb = { c d }\n\ne = {\n\tf = 2\n\tg\n\t{ 1 2 }\n}\n",
+        "diagnostics": []
+      }
+    },
+    {
+      "source": "e = { [[POP_GROUP] $POP_GROUP$ = { x = 1 } ] [[!POP_GROUP] y = 2 ] }",
+      "file": "parser.test.ts:91",
+      "expected": {
+        "items": [
+          {
+            "kind": "entry",
+            "key": "e",
+            "op": "=",
+            "value": {
+              "kind": "container",
+              "items": [
+                {
+                  "kind": "param",
+                  "name": "POP_GROUP",
+                  "negated": false,
+                  "items": [
+                    {
+                      "kind": "entry",
+                      "key": "$POP_GROUP$",
+                      "op": "=",
+                      "value": {
+                        "kind": "container",
+                        "items": [
+                          {
+                            "kind": "entry",
+                            "key": "x",
+                            "op": "=",
+                            "value": {
+                              "kind": "num",
+                              "lexeme": "1"
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                },
+                {
+                  "kind": "param",
+                  "name": "POP_GROUP",
+                  "negated": true,
+                  "items": [
+                    {
+                      "kind": "entry",
+                      "key": "y",
+                      "op": "=",
+                      "value": {
+                        "kind": "num",
+                        "lexeme": "2"
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ],
+        "canonical": "e = {\n\t[[POP_GROUP]\n\t\t$POP_GROUP$ = {\n\t\t\tx = 1\n\t\t}\n\t]\n\t[[!POP_GROUP]\n\t\ty = 2\n\t]\n}\n",
+        "diagnostics": []
+      }
+    },
+    {
+      "source": "color = { 1 2 } } foo{bar=1}",
+      "file": "parser.test.ts:92",
+      "expected": {
+        "items": [
+          {
+            "kind": "entry",
+            "key": "color",
+            "op": "=",
+            "value": {
+              "kind": "container",
+              "items": [
+                {
+                  "kind": "num",
+                  "lexeme": "1"
+                },
+                {
+                  "kind": "num",
+                  "lexeme": "2"
+                }
+              ]
+            }
+          },
+          {
+            "kind": "entry",
+            "key": "foo",
+            "op": "=",
+            "value": {
+              "kind": "container",
+              "items": [
+                {
+                  "kind": "entry",
+                  "key": "bar",
+                  "op": "=",
+                  "value": {
+                    "kind": "num",
+                    "lexeme": "1"
+                  }
+                }
+              ]
+            }
+          }
+        ],
+        "canonical": "color = { 1 2 }\n\nfoo = {\n\tbar = 1\n}\n",
+        "diagnostics": [
+          {
+            "kind": "stray-closing-brace",
+            "line": 1,
+            "text": "}"
+          },
+          {
+            "kind": "operator-less-entry",
+            "line": 1,
+            "text": "foo"
+          }
+        ]
+      }
+    },
+    {
+      "source": "[[X] a = { ]",
+      "file": "region-fallback.test.ts:0",
+      "expected": {
+        "items": [
+          {
+            "kind": "param-text",
+            "name": "X",
+            "negated": false,
+            "text": " a = { "
+          }
+        ],
+        "canonical": "[[X] a = { ]\n",
+        "diagnostics": []
+      }
+    },
+    {
+      "source": "a = { b = 1 }\nc = 2",
+      "file": "walk.test.ts:0",
+      "expected": {
+        "items": [
+          {
+            "kind": "entry",
+            "key": "a",
+            "op": "=",
+            "value": {
+              "kind": "container",
+              "items": [
+                {
+                  "kind": "entry",
+                  "key": "b",
+                  "op": "=",
+                  "value": {
+                    "kind": "num",
+                    "lexeme": "1"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "kind": "entry",
+            "key": "c",
+            "op": "=",
+            "value": {
+              "kind": "num",
+              "lexeme": "2"
+            }
+          }
+        ],
+        "canonical": "a = {\n\tb = 1\n}\n\nc = 2\n",
+        "diagnostics": []
+      }
+    },
+    {
+      "source": "a = { b = { c } d = 2 }\ne = 3",
+      "file": "walk.test.ts:1",
+      "expected": {
+        "items": [
+          {
+            "kind": "entry",
+            "key": "a",
+            "op": "=",
+            "value": {
+              "kind": "container",
+              "items": [
+                {
+                  "kind": "entry",
+                  "key": "b",
+                  "op": "=",
+                  "value": {
+                    "kind": "container",
+                    "items": [
+                      {
+                        "kind": "str",
+                        "value": "c",
+                        "quoted": false
+                      }
+                    ]
+                  }
+                },
+                {
+                  "kind": "entry",
+                  "key": "d",
+                  "op": "=",
+                  "value": {
+                    "kind": "num",
+                    "lexeme": "2"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "kind": "entry",
+            "key": "e",
+            "op": "=",
+            "value": {
+              "kind": "num",
+              "lexeme": "3"
+            }
+          }
+        ],
+        "canonical": "a = {\n\tb = { c }\n\td = 2\n}\n\ne = 3\n",
+        "diagnostics": []
+      }
+    },
+    {
+      "source": "a = { b = 1 }",
+      "file": "walk.test.ts:2",
+      "expected": {
+        "items": [
+          {
+            "kind": "entry",
+            "key": "a",
+            "op": "=",
+            "value": {
+              "kind": "container",
+              "items": [
+                {
+                  "kind": "entry",
+                  "key": "b",
+                  "op": "=",
+                  "value": {
+                    "kind": "num",
+                    "lexeme": "1"
+                  }
+                }
+              ]
+            }
+          }
+        ],
+        "canonical": "a = {\n\tb = 1\n}\n",
+        "diagnostics": []
+      }
+    },
+    {
+      "source": "a = { b = 1 }\nc = 2",
+      "file": "walk.test.ts:3",
+      "expected": {
+        "items": [
+          {
+            "kind": "entry",
+            "key": "a",
+            "op": "=",
+            "value": {
+              "kind": "container",
+              "items": [
+                {
+                  "kind": "entry",
+                  "key": "b",
+                  "op": "=",
+                  "value": {
+                    "kind": "num",
+                    "lexeme": "1"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "kind": "entry",
+            "key": "c",
+            "op": "=",
+            "value": {
+              "kind": "num",
+              "lexeme": "2"
+            }
+          }
+        ],
+        "canonical": "a = {\n\tb = 1\n}\n\nc = 2\n",
+        "diagnostics": []
+      }
+    }
+  ]
+}

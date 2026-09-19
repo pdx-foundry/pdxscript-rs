@@ -1,6 +1,18 @@
 [package]
-name = "pdxscript-rs"
+name = "pdxscript"
 version = "0.1.0"
 edition = "2024"
+license = "MIT"
+description = "Syntax-only PDXScript and CWT parsing, with canonical PDXScript serialization"
+repository = "https://github.com/pdx-foundry/pdxscript-rs"
 
 [dependencies]
+serde = { version = "1", features = ["derive"] }
+
+[dev-dependencies]
+serde_json = "1"
+proptest = "1"
+
+[[example]]
+name = "conformance"
+path = "tools/conformance.rs"
