@@ -25,7 +25,10 @@ fn trees() -> impl Strategy<Value = Item> {
 proptest! {
     #[test]
     fn all_constructible_forms_roundtrip(tree in trees()) {
-        let written=serialize(&[tree]).unwrap();let doc=parse(&written,"generated").unwrap();
+        let written = serialize(&[tree]).unwrap();
+        let doc = parse(&written, "generated").unwrap();
+
+
         prop_assert!(doc.diagnostics.is_empty());
         prop_assert_eq!(serialize(&doc.items).unwrap(),written);
     }

@@ -11,9 +11,7 @@ fn pinned_typescript_grammar_claims() {
         let source = case["source"].as_str().unwrap();
         let file = case["file"].as_str().unwrap();
         let actual = match parse(source, file) {
-            Ok(doc) => {
-                json!({"items":normalized::items(&doc.items),"canonical":serialize(&doc.items).unwrap(),"diagnostics":doc.diagnostics.iter().map(|d|json!({"kind":d.kind,"line":d.span.line,"text":d.text})).collect::<Vec<_>>()})
-            }
+            Ok(doc) => normalized::response(&doc).unwrap(),
             Err(e) => json!({"error":true,"line":e.span.line}),
         };
         assert_eq!(actual, case["expected"], "{file}: {source}");

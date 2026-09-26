@@ -20,6 +20,7 @@ pub enum WalkControl<C> {
     Stop,
 }
 /// Returns owned children in order. Entry values are wrapped as items without source metadata.
+/// With `RegionPolicy::Read`, tokenization of a verbatim body can return a syntax error.
 pub fn item_children(item: &Item, regions: RegionPolicy<'_>) -> Result<Vec<Item>, SyntaxError> {
     Ok(match &item.kind {
         ItemKind::Entry(entry) => vec![Item::new(match &entry.value {

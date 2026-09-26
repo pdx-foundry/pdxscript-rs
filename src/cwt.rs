@@ -15,6 +15,7 @@ pub enum Operator {
     #[serde(rename = "==")]
     Equal,
 }
+
 /// Uninterpreted scalar spelling.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Scalar {
@@ -25,6 +26,7 @@ pub struct Scalar {
     /// Source location including quotes when present.
     pub span: Span,
 }
+
 /// A scalar or ordered CWT block.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", content = "data")]
@@ -39,6 +41,7 @@ pub enum Value {
         span: Span,
     },
 }
+
 impl Value {
     /// Location of this value.
     pub fn span(&self) -> Span {
@@ -48,6 +51,7 @@ impl Value {
         }
     }
 }
+
 /// Semantic CWT comment retained with its original spelling and location.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Annotation {
@@ -58,6 +62,7 @@ pub struct Annotation {
     /// Complete source span.
     pub span: Span,
 }
+
 /// A keyed rule or bare value with annotations bound to this entry only.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Node {
@@ -72,16 +77,19 @@ pub struct Node {
     /// Key/value through the final token, excluding preceding annotations.
     pub span: Span,
 }
+
 /// Input that could not be bound or parsed; never silently discarded.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Diagnostic {
-    /// Stable diagnostic category.
+    /// `syntax` marks malformed input; `orphan-annotation` marks unattached metadata;
+    /// `nesting-limit` marks input beyond the supported nesting depth.
     pub kind: String,
     /// Source location.
     pub span: Span,
     /// Diagnostic explanation.
     pub message: String,
 }
+
 /// A partial or complete parse. Nonempty diagnostics must be surfaced by consumers.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Document {
@@ -92,6 +100,7 @@ pub struct Document {
     /// Unparsed source and unattached metadata.
     pub diagnostics: Vec<Diagnostic>,
 }
+
 #[derive(Clone)]
 enum Token {
     Scalar(Scalar),
@@ -100,6 +109,7 @@ enum Token {
     Close(Span),
     Annotation(Annotation),
 }
+
 impl Token {
     fn span(&self) -> Span {
         match self {
@@ -109,7 +119,8 @@ impl Token {
         }
     }
 }
-fn tokenize(text: &str, file: &str) -> (Vec<Token>, Option<SyntaxError>) {
+
+fn tokenize(text: &str, file: &str, end: Span) -> (Vec<Token>, Option<SyntaxError>) {
     let mut s = Scanner::new(text, 0, 1);
     if text.starts_with('\u{feff}') {
         s.advance(3);
@@ -163,8 +174,7 @@ fn tokenize(text: &str, file: &str) -> (Vec<Token>, Option<SyntaxError>) {
                     span: s.finish(start),
                 }),
                 Err(mut e) => {
-                    e.span.end = text.len();
-                    e.span.end_line = text.bytes().filter(|&b| b == b'\n').count() + 1;
+                    e.span = e.span.through(end);
                     return (tokens, Some(e));
                 }
             },
@@ -186,6 +196,7 @@ fn tokenize(text: &str, file: &str) -> (Vec<Token>, Option<SyntaxError>) {
     }
     (tokens, None)
 }
+
 struct Frame {
     nodes: Vec<Node>,
     annotations: Vec<Annotation>,
@@ -195,6 +206,7 @@ struct Frame {
     start: Span,
     attached: Vec<Annotation>,
 }
+
 impl Frame {
     fn root() -> Self {
         Self {
@@ -208,16 +220,25 @@ impl Frame {
         }
     }
 }
-fn orphans(frame: &mut Frame, diagnostics: &mut Vec<Diagnostic>) {
-    diagnostics.extend(frame.annotations.drain(..).map(|a| Diagnostic {
+
+fn diagnose_orphans(annotations: &mut Vec<Annotation>, diagnostics: &mut Vec<Diagnostic>) {
+    diagnostics.extend(annotations.drain(..).map(|a| Diagnostic {
         kind: "orphan-annotation".into(),
         span: a.span,
         message: a.text,
     }));
 }
+
 /// Parses CWT, retaining recoverable diagnostics and partial nodes instead of hiding unparsed input.
 pub fn parse(source: &str, file: &str) -> Document {
-    let (tokens, lexical_error) = tokenize(source, file);
+    let line = source.bytes().filter(|&b| b == b'\n').count() + 1;
+    let end = Span {
+        start: source.len(),
+        end: source.len(),
+        line,
+        end_line: line,
+    };
+    let (tokens, lexical_error) = tokenize(source, file, end);
     let mut diagnostics = Vec::new();
     if let Some(e) = lexical_error {
         diagnostics.push(Diagnostic {
@@ -226,7 +247,7 @@ pub fn parse(source: &str, file: &str) -> Document {
             message: e.message,
         });
     }
-    let nodes = parse_tokens(tokens, source, &mut diagnostics);
+    let nodes = parse_tokens(tokens, end, &mut diagnostics);
     diagnostics.sort_by_key(|d| (d.span.start, d.kind.clone()));
     Document {
         file: file.into(),
@@ -235,7 +256,7 @@ pub fn parse(source: &str, file: &str) -> Document {
     }
 }
 
-fn parse_tokens(tokens: Vec<Token>, source: &str, diagnostics: &mut Vec<Diagnostic>) -> Vec<Node> {
+fn parse_tokens(tokens: Vec<Token>, end: Span, diagnostics: &mut Vec<Diagnostic>) -> Vec<Node> {
     let mut cursor = Cursor::new(tokens);
     let mut frames = vec![Frame::root()];
     while let Some(token) = cursor.take() {
@@ -243,7 +264,7 @@ fn parse_tokens(tokens: Vec<Token>, source: &str, diagnostics: &mut Vec<Diagnost
         match token {
             Token::Annotation(a) => frame.annotations.push(a),
             Token::Close(close) => {
-                orphans(frame, diagnostics);
+                diagnose_orphans(&mut frame.annotations, diagnostics);
                 if frames.len() == 1 {
                     diagnostics.push(Diagnostic {
                         kind: "syntax".into(),
@@ -271,30 +292,16 @@ fn parse_tokens(tokens: Vec<Token>, source: &str, diagnostics: &mut Vec<Diagnost
             }),
             first => {
                 let start = first.span();
-                let (key, op, value) = if let Token::Scalar(key) = &first {
-                    if let Some(Token::Op(op, _)) = cursor.peek() {
-                        let op = *op;
-                        cursor.take();
-                        match cursor.peek() {
-                            Some(Token::Scalar(_) | Token::Open(_)) => {
-                                (Some(key.clone()), Some(op), cursor.take().expect("value"))
-                            }
-                            _ => {
-                                diagnostics.push(Diagnostic {
-                                    kind: "syntax".into(),
-                                    span: start,
-                                    message: "Missing assignment value".into(),
-                                });
-                                orphans(frame, diagnostics);
-                                continue;
-                            }
-                        }
-                    } else {
-                        (None, None, first)
-                    }
-                } else {
-                    (None, None, first)
+                let Some((key, op, value)) = recognize_statement(first, &mut cursor) else {
+                    diagnostics.push(Diagnostic {
+                        kind: "syntax".into(),
+                        span: start,
+                        message: "Missing assignment value".into(),
+                    });
+                    diagnose_orphans(&mut frame.annotations, diagnostics);
+                    continue;
                 };
+
                 let attached = std::mem::take(&mut frame.annotations);
                 match value {
                     Token::Scalar(value) => frame.nodes.push(Node {
@@ -308,11 +315,7 @@ fn parse_tokens(tokens: Vec<Token>, source: &str, diagnostics: &mut Vec<Diagnost
                         if frames.len() > MAX_NESTING_DEPTH {
                             diagnostics.push(Diagnostic {
                                 kind: "nesting-limit".into(),
-                                span: Span {
-                                    end: source.len(),
-                                    end_line: source.bytes().filter(|&b| b == b'\n').count() + 1,
-                                    ..start
-                                },
+                                span: start.through(end),
                                 message:
                                     "Nesting exceeds supported limit; remaining input unparsed"
                                         .into(),
@@ -333,33 +336,45 @@ fn parse_tokens(tokens: Vec<Token>, source: &str, diagnostics: &mut Vec<Diagnost
             }
         }
     }
-    finish_frames(frames, source, diagnostics)
+    finish_frames(frames, end, diagnostics)
+}
+
+fn recognize_statement(
+    first: Token,
+    cursor: &mut Cursor<Token>,
+) -> Option<(Option<Scalar>, Option<Operator>, Token)> {
+    let Token::Scalar(key) = &first else {
+        return Some((None, None, first));
+    };
+    let Some(Token::Op(op, _)) = cursor.peek() else {
+        return Some((None, None, first));
+    };
+    let op = *op;
+    cursor.take();
+
+    if !matches!(cursor.peek(), Some(Token::Scalar(_) | Token::Open(_))) {
+        return None;
+    }
+
+    Some((Some(key.clone()), Some(op), cursor.take().expect("value")))
 }
 
 fn finish_frames(
     mut frames: Vec<Frame>,
-    source: &str,
+    end: Span,
     diagnostics: &mut Vec<Diagnostic>,
 ) -> Vec<Node> {
     while frames.len() > 1 {
         let mut child = frames.pop().expect("child");
-        orphans(&mut child, diagnostics);
+        diagnose_orphans(&mut child.annotations, diagnostics);
         diagnostics.push(Diagnostic {
             kind: "syntax".into(),
-            span: Span {
-                end: source.len(),
-                end_line: source.bytes().filter(|&b| b == b'\n').count() + 1,
-                ..child.start
-            },
+            span: child.start.through(end),
             message: "Unclosed block; contents remain unparsed".into(),
         });
-        diagnostics.extend(child.attached.into_iter().map(|a| Diagnostic {
-            kind: "orphan-annotation".into(),
-            span: a.span,
-            message: a.text,
-        }));
+        diagnose_orphans(&mut child.attached, diagnostics);
     }
     let mut root = frames.pop().expect("root");
-    orphans(&mut root, diagnostics);
+    diagnose_orphans(&mut root.annotations, diagnostics);
     root.nodes
 }

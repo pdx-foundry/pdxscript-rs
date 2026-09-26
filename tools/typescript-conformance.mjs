@@ -18,6 +18,8 @@ const child = spawn('./target/debug/examples/conformance', [], { stdio:['pipe','
 const lines = createInterface({ input:child.stdout })[Symbol.asyncIterator]();
 let count = 0;
 const fixtures = [];
+const vanilla = process.argv.includes('--vanilla');
+const fixtureCallNames = new Set(['parse', 'clean', 'first', 'value', 'emitted', 'expectFixpoint']);
 async function compare(source, file) {
   let expected;
   try {
@@ -32,7 +34,7 @@ async function compare(source, file) {
   assert(!line.done, 'Rust runner stopped');
   assert.deepEqual(JSON.parse(line.value), expected, file + ': ' + source.slice(0,120));
   count++;
-  if (!process.argv.includes('--vanilla')) fixtures.push({source,file,expected});
+  if (!vanilla) fixtures.push({source,file,expected});
 }
 try {
   for (const name of ['parser.test.ts','region-fallback.test.ts','walk.test.ts','properties.test.ts']) {
@@ -40,15 +42,21 @@ try {
     const tree = ts.createSourceFile(name, source, ts.ScriptTarget.Latest, true);
     const cases = [];
     function visit(node) {
-      if (ts.isCallExpression(node) && ['parse','clean','first','value','emitted','expectFixpoint'].includes(node.expression.getText(tree)) && node.arguments[0] && (ts.isStringLiteral(node.arguments[0]) || ts.isNoSubstitutionTemplateLiteral(node.arguments[0]))) {
-        cases.push(node.arguments[0].text);
+      if (ts.isCallExpression(node) && fixtureCallNames.has(node.expression.getText(tree))) {
+        const sourceArgument = node.arguments[0];
+        const hasLiteralSource = sourceArgument && (
+          ts.isStringLiteral(sourceArgument) || ts.isNoSubstitutionTemplateLiteral(sourceArgument)
+        );
+
+        if (hasLiteralSource) cases.push(sourceArgument.text);
       }
+
       ts.forEachChild(node, visit);
     }
     visit(tree);
     for (let i=0;i<cases.length;i++) await compare(cases[i], `${name}:${i}`);
   }
-  if (process.argv.includes('--vanilla')) {
+  if (vanilla) {
     const install = process.env.STELLARIS_PATH;
     assert(install, 'STELLARIS_PATH is required; corpus checks cannot skip');
     async function walk(dir) {

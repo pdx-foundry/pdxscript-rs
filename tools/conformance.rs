@@ -1,6 +1,5 @@
 use pdxscript::script::*;
 mod normalized;
-use normalized::items;
 use serde_json::{Value as Json, json};
 use std::io::{self, BufRead, Write};
 
@@ -11,10 +10,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let source = request["source"].as_str().ok_or("source required")?;
         let file = request["file"].as_str().unwrap_or("<test>");
         let answer = match parse(source, file) {
-            Ok(doc) => match serialize(&doc.items) {
-                Ok(canonical) => {
-                    json!({"items":items(&doc.items),"canonical":canonical,"diagnostics":doc.diagnostics.iter().map(|d| json!({"kind":d.kind,"line":d.span.line,"text":d.text})).collect::<Vec<_>>()})
-                }
+            Ok(doc) => match normalized::response(&doc) {
+                Ok(response) => response,
                 Err(e) => json!({"write_error":e.to_string()}),
             },
             Err(e) => json!({"error":true,"line":e.span.line}),
