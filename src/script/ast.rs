@@ -38,17 +38,19 @@ impl Operator {
     }
     /// Recognizes only supported game-script operators.
     pub fn parse(text: &str) -> Option<Self> {
-        match text {
-            "=" => Some(Self::Assign),
-            ">" => Some(Self::Greater),
-            "<" => Some(Self::Less),
-            ">=" => Some(Self::GreaterEqual),
-            "<=" => Some(Self::LessEqual),
-            "!=" => Some(Self::NotEqual),
-            _ => None,
-        }
+        [
+            Self::Assign,
+            Self::Greater,
+            Self::Less,
+            Self::GreaterEqual,
+            Self::LessEqual,
+            Self::NotEqual,
+        ]
+        .into_iter()
+        .find(|operator| operator.as_str() == text)
     }
 }
+
 /// A scalar preserves exact text rather than projecting numbers or interpreting variables.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind")]
@@ -275,7 +277,7 @@ pub fn list(key: impl Into<String>, values: Vec<Scalar>) -> Result<Item, SyntaxE
             .collect(),
     )
 }
-/// Constructs a balanced conditional region.
+/// Constructs a balanced conditional region. `negated: true` tests for parameter absence.
 pub fn param_block(
     name: impl Into<String>,
     items: Vec<Item>,
@@ -292,6 +294,7 @@ pub fn param_block(
     }))
 }
 /// Constructs conditional text only when it reparses as the same verbatim region.
+/// `negated: true` tests for parameter absence.
 pub fn param_text(
     name: impl Into<String>,
     text: impl Into<String>,

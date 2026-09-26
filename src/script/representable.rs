@@ -76,13 +76,15 @@ pub fn decimal_lexeme(value: f64) -> Result<String, SyntaxError> {
     };
     canonical_numeral(&text)
 }
-/// Converts a numeral to a double only when the port's numeric projection preserves its spelling/value.
+/// Converts a numeral to a finite double whose decimal output matches the canonical input.
+/// Returns `None` for invalid numerals or when conversion changes the canonical digits.
 pub fn try_number_value(text: &str) -> Option<f64> {
     let canonical = canonical_numeral(text).ok()?;
     let value: f64 = canonical.parse().ok()?;
     (decimal_lexeme(value).ok()? == canonical).then_some(value)
 }
-/// Checked double projection; the syntax tree itself always keeps the digits.
+/// Converts a numeral to a double, failing if its decimal output changes the canonical digits.
+/// Invalid numerals and non-finite results also return an error; syntax trees keep the original digits.
 pub fn number_value(text: &str) -> Result<f64, SyntaxError> {
     try_number_value(text).ok_or_else(|| invalid("Numeral cannot be projected without rounding"))
 }

@@ -55,104 +55,159 @@ fn schedule_items<'a>(
         }
     }
 }
+fn schedule_value<'a>(
+    stack: &mut Vec<Write<'a>>,
+    value: &'a Value,
+    depth: usize,
+) -> Result<(), SyntaxError> {
+    match value {
+        Value::Scalar(value) => stack.push(Write::Text(scalar_text(value)?)),
+        Value::Container(body) => stack.push(Write::Body(body, depth)),
+    }
+
+    Ok(())
+}
+
+fn schedule_item<'a>(
+    stack: &mut Vec<Write<'a>>,
+    item: &'a Item,
+    depth: usize,
+) -> Result<(), SyntaxError> {
+    match &item.kind {
+        ItemKind::Scalar(value) => stack.push(Write::Text(scalar_text(value)?)),
+        ItemKind::Container(body) => stack.push(Write::Body(body, depth)),
+        ItemKind::Entry(entry) => {
+            let key = if is_bare_key(&entry.key) {
+                entry.key.clone()
+            } else {
+                quoted_text(&entry.key)?
+            };
+
+            schedule_value(stack, &entry.value, depth)?;
+            stack.push(Write::Text(format!("{key} {} ", entry.op.as_str())));
+        }
+        ItemKind::Param {
+            name,
+            negated,
+            items,
+        } => {
+            stack.push(Write::Region(name, *negated, items, depth));
+        }
+        ItemKind::ParamText {
+            name,
+            negated,
+            text,
+        } => {
+            enter(depth)?;
+            if let Some(problem) = region_text_problem(name, *negated, text) {
+                return Err(invalid(&problem));
+            }
+
+            stack.push(Write::Text(format!(
+                "[[{}{name}]{text}]",
+                if *negated { "!" } else { "" }
+            )));
+        }
+    }
+
+    stack.push(Write::Text("\t".repeat(depth)));
+    Ok(())
+}
+
+fn scalar_body_text(items: &[Item]) -> Result<Option<String>, SyntaxError> {
+    let scalars: Option<Vec<_>> = items
+        .iter()
+        .map(|item| match &item.kind {
+            ItemKind::Scalar(value) => Some(value),
+            _ => None,
+        })
+        .collect();
+    let Some(scalars) = scalars else {
+        return Ok(None);
+    };
+
+    let values = scalars
+        .into_iter()
+        .map(scalar_text)
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(Some(format!("{{ {} }}", values.join(" "))))
+}
+
+fn schedule_body<'a>(
+    stack: &mut Vec<Write<'a>>,
+    body: &'a Container,
+    depth: usize,
+) -> Result<(), SyntaxError> {
+    enter(depth)?;
+    let header = match &body.header {
+        Some(header) if !is_bare_token(header) => {
+            return Err(invalid("Invalid container header"));
+        }
+        Some(header) => format!("{header} "),
+        None => String::new(),
+    };
+
+    if body.items.is_empty() {
+        stack.push(Write::Text("{}".into()));
+    } else if let Some(text) = scalar_body_text(&body.items)? {
+        stack.push(Write::Text(text));
+    } else {
+        stack.push(Write::Text(format!("\n{}}}", "\t".repeat(depth))));
+        schedule_items(stack, &body.items, depth + 1, "\n");
+        stack.push(Write::Text("{\n".into()));
+    }
+
+    stack.push(Write::Text(header));
+    Ok(())
+}
+
+fn schedule_region<'a>(
+    stack: &mut Vec<Write<'a>>,
+    name: &str,
+    negated: bool,
+    items: &'a [Item],
+    depth: usize,
+) -> Result<(), SyntaxError> {
+    enter(depth)?;
+    if !is_param_name(name) {
+        return Err(invalid("Invalid parameter name"));
+    }
+
+    stack.push(Write::Text(format!(
+        "{}{}]",
+        if items.is_empty() { "" } else { "\n" },
+        "\t".repeat(depth)
+    )));
+    schedule_items(stack, items, depth + 1, "\n");
+    stack.push(Write::Text(format!(
+        "[[{}{name}]\n",
+        if negated { "!" } else { "" }
+    )));
+    Ok(())
+}
+
 /// Writes canonical script with tabs and a final newline. Locations, comments, and repairs are not reproduced.
 pub fn serialize(items: &[Item]) -> Result<String, SyntaxError> {
     let mut stack = vec![Write::Text("\n".into())];
     schedule_items(&mut stack, items, 0, "\n\n");
     let mut output = String::new();
+
     while let Some(action) = stack.pop() {
         match action {
             Write::Text(text) => output.push_str(&text),
-            Write::Item(item, depth) => {
-                output.push_str(&"\t".repeat(depth));
-                match &item.kind {
-                    ItemKind::Scalar(value) => output.push_str(&scalar_text(value)?),
-                    ItemKind::Container(body) => stack.push(Write::Body(body, depth)),
-                    ItemKind::Entry(entry) => {
-                        let key = if is_bare_key(&entry.key) {
-                            entry.key.clone()
-                        } else {
-                            quoted_text(&entry.key)?
-                        };
-                        output.push_str(&format!("{key} {} ", entry.op.as_str()));
-                        match &entry.value {
-                            Value::Scalar(value) => output.push_str(&scalar_text(value)?),
-                            Value::Container(body) => stack.push(Write::Body(body, depth)),
-                        }
-                    }
-                    ItemKind::Param {
-                        name,
-                        negated,
-                        items,
-                    } => stack.push(Write::Region(name, *negated, items, depth)),
-                    ItemKind::ParamText {
-                        name,
-                        negated,
-                        text,
-                    } => {
-                        enter(depth)?;
-                        if let Some(problem) = region_text_problem(name, *negated, text) {
-                            return Err(invalid(&problem));
-                        }
-                        output.push_str(&format!(
-                            "[[{}{name}]{text}]",
-                            if *negated { "!" } else { "" }
-                        ));
-                    }
-                }
-            }
-            Write::Body(body, depth) => {
-                enter(depth)?;
-                if let Some(header) = &body.header {
-                    if !is_bare_token(header) {
-                        return Err(invalid("Invalid container header"));
-                    }
-                    output.push_str(header);
-                    output.push(' ');
-                }
-                if body.items.is_empty() {
-                    output.push_str("{}");
-                } else if body
-                    .items
-                    .iter()
-                    .all(|i| matches!(i.kind, ItemKind::Scalar(_)))
-                {
-                    output.push_str("{ ");
-                    for (index, item) in body.items.iter().enumerate() {
-                        if index != 0 {
-                            output.push(' ');
-                        }
-                        let ItemKind::Scalar(value) = &item.kind else {
-                            unreachable!()
-                        };
-                        output.push_str(&scalar_text(value)?);
-                    }
-                    output.push_str(" }");
-                } else {
-                    output.push_str("{\n");
-                    stack.push(Write::Text(format!("\n{}}}", "\t".repeat(depth))));
-                    schedule_items(&mut stack, &body.items, depth + 1, "\n");
-                }
-            }
+            Write::Item(item, depth) => schedule_item(&mut stack, item, depth)?,
+            Write::Body(body, depth) => schedule_body(&mut stack, body, depth)?,
             Write::Region(name, negated, items, depth) => {
-                enter(depth)?;
-                if !is_param_name(name) {
-                    return Err(invalid("Invalid parameter name"));
-                }
-                output.push_str(&format!("[[{}{name}]\n", if negated { "!" } else { "" }));
-                stack.push(Write::Text(format!(
-                    "{}{}]",
-                    if items.is_empty() { "" } else { "\n" },
-                    "\t".repeat(depth)
-                )));
-                schedule_items(&mut stack, items, depth + 1, "\n");
+                schedule_region(&mut stack, name, negated, items, depth)?;
             }
         }
     }
+
     if output.starts_with('\u{feff}') {
         return Err(invalid(
             "A document cannot emit a leading BOM as scalar content",
         ));
     }
+
     Ok(output)
 }

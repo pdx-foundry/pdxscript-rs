@@ -36,3 +36,26 @@ pub fn items(nodes: &[Item]) -> Vec<Json> {
         })
         .collect()
 }
+
+/// Builds the shared success response used by the conformance runner and fixture checks.
+pub fn response(document: &Document) -> Result<Json, pdxscript::SyntaxError> {
+    let canonical = serialize(&document.items)?;
+    let normalized_items = items(&document.items);
+    let diagnostics: Vec<_> = document
+        .diagnostics
+        .iter()
+        .map(|diagnostic| {
+            json!({
+                "kind": diagnostic.kind,
+                "line": diagnostic.span.line,
+                "text": diagnostic.text,
+            })
+        })
+        .collect();
+
+    Ok(json!({
+        "items": normalized_items,
+        "canonical": canonical,
+        "diagnostics": diagnostics,
+    }))
+}

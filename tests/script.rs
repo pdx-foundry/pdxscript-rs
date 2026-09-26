@@ -156,31 +156,75 @@ fn nesting_boundary_does_not_use_call_stack() {
         ErrorKind::NestingLimit
     );
 }
+#[test]
+fn operator_spellings_agree_across_parsing_writing_and_serde() {
+    for (operator, spelling) in [
+        (Operator::Assign, "="),
+        (Operator::Greater, ">"),
+        (Operator::Less, "<"),
+        (Operator::GreaterEqual, ">="),
+        (Operator::LessEqual, "<="),
+        (Operator::NotEqual, "!="),
+    ] {
+        let encoded = serde_json::to_value(operator).unwrap();
+
+        assert_eq!(operator.as_str(), spelling);
+        assert_eq!(Operator::parse(spelling), Some(operator));
+        assert_eq!(encoded, serde_json::json!(spelling));
+        assert_eq!(
+            serde_json::from_value::<Operator>(encoded).unwrap(),
+            operator
+        );
+    }
+
+    assert_eq!(Operator::parse("=="), None);
+    assert!(serde_json::from_value::<Operator>(serde_json::json!("==")).is_err());
+}
+
 proptest! {
     #[test]
-    fn arbitrary_input_never_panics(text in ".{0,400}") { let _=parse(&text,"generated"); }
+    fn arbitrary_input_never_panics(text in ".{0,400}") {
+        let _ = parse(&text, "generated");
+    }
+
     #[test]
     fn strings_survive_quoting(text in "[a-zA-Z0-9_ @.]{0,60}") {
-        let value=scalar(text.clone()).unwrap();
-        let doc=parse(&scalar_text(&value).unwrap(),"generated").unwrap();
+        let value = scalar(text.clone()).unwrap();
+        let written = scalar_text(&value).unwrap();
+        let doc = parse(&written, "generated").unwrap();
+
         prop_assert!(matches!(&doc.items[0].kind,ItemKind::Scalar(Scalar::String{value,..}) if value==&text), "string changed");
     }
+
     #[test]
     fn generated_tree_fixpoint(values in prop::collection::vec(("[a-z]{1,8}", any::<i64>(), any::<bool>()),0..40)) {
-        let mut items=Vec::new();
-        for (key,number,nested) in values {
-            let item=kv(key,Value::Scalar(numeral(&number.to_string()).unwrap())).unwrap();
-            items.push(if nested { block("nested",vec![item]).unwrap() } else { item });
+        let mut items = Vec::new();
+
+        for (key, number, nested) in values {
+            let value = numeral(&number.to_string()).unwrap();
+            let item = kv(key, Value::Scalar(value)).unwrap();
+            let item = if nested {
+                block("nested", vec![item]).unwrap()
+            } else {
+                item
+            };
+
+            items.push(item);
         }
-        let text=serialize(&items).unwrap();
-        prop_assert_eq!(without_spans(&parse(&text,"generated").unwrap().items), items);
+
+        let text = serialize(&items).unwrap();
+        let doc = parse(&text, "generated").unwrap();
+
+        prop_assert_eq!(without_spans(&doc.items), items);
     }
+
     #[test]
     fn accepted_text_repairs_to_a_fixpoint(text in ".{0,300}") {
-        if let Ok(doc)=parse(&text,"generated") && let Ok(written)=serialize(&doc.items) {
-                let again=parse(&written,"generated").unwrap();
-                prop_assert!(again.diagnostics.is_empty());
-                prop_assert_eq!(serialize(&again.items).unwrap(),written);
+        if let Ok(doc) = parse(&text, "generated") && let Ok(written) = serialize(&doc.items) {
+            let again = parse(&written, "generated").unwrap();
+
+            prop_assert!(again.diagnostics.is_empty());
+            prop_assert_eq!(serialize(&again.items).unwrap(), written);
         }
     }
 }

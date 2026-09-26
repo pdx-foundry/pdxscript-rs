@@ -102,7 +102,7 @@ fn parse_tokens(tokens: Vec<Token>, file: &str, end: Span) -> Result<Document, S
         {
             continue;
         }
-        let mut complete = frames.pop().expect("completed frame");
+        let complete = frames.pop().expect("completed frame");
         match complete.attach {
             Attach::Root => {
                 return Ok(Document {
@@ -113,29 +113,42 @@ fn parse_tokens(tokens: Vec<Token>, file: &str, end: Span) -> Result<Document, S
             }
             Attach::Container { .. } => unreachable!("containers completed by advance_frame"),
             Attach::Region(token) => {
-                let parent = frames.last_mut().expect("region parent");
-                if complete
-                    .diagnostics
-                    .iter()
-                    .any(|d| d.kind != Repair::OperatorLessEntry)
-                {
-                    parent.items.push(region_text(token));
-                } else {
-                    let (name, negated) = region_name(&token);
-                    parent.items.push(Item {
-                        span: Some(token.span),
-                        kind: ItemKind::Param {
-                            name,
-                            negated,
-                            items: complete.items,
-                        },
-                    });
-                    parent.diagnostics.append(&mut complete.diagnostics);
-                }
+                complete_region(
+                    frames.last_mut().expect("region parent"),
+                    token,
+                    complete.items,
+                    complete.diagnostics,
+                );
             }
         }
     }
 }
+fn complete_region(
+    parent: &mut Frame,
+    token: Token,
+    items: Vec<Item>,
+    mut diagnostics: Vec<Diagnostic>,
+) {
+    let needs_verbatim_body = diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic.kind != Repair::OperatorLessEntry);
+    if needs_verbatim_body {
+        parent.items.push(region_text(token));
+        return;
+    }
+
+    let (name, negated) = region_name(&token);
+    parent.items.push(Item {
+        span: Some(token.span),
+        kind: ItemKind::Param {
+            name,
+            negated,
+            items,
+        },
+    });
+    parent.diagnostics.append(&mut diagnostics);
+}
+
 fn region_name(token: &Token) -> (String, bool) {
     (
         token.text.strip_prefix('!').unwrap_or(&token.text).into(),
@@ -163,8 +176,9 @@ fn complete_container(frames: &mut Vec<Frame>, close: Option<Token>) {
     else {
         unreachable!()
     };
+    let unclosed_at_eof = close.is_none();
     let end = close.map_or(child.end, |t| t.span);
-    if end == child.end {
+    if unclosed_at_eof {
         child.diagnostics.push(Diagnostic {
             kind: Repair::UnclosedAtEof,
             span,
@@ -334,7 +348,9 @@ fn advance_frame(frames: &mut Vec<Frame>, file: &str) -> Result<(), SyntaxError>
     }
     Ok(())
 }
-/// Reads a verbatim conditional body as a flat sequence, without inventing brace relationships.
+/// Reads words, inline math, and nested regions from a verbatim conditional body in source order.
+/// Braces and operators are omitted; brace relationships are not inferred.
+/// Returns an error if tokenization fails.
 pub fn region_items(text: &str, file: &str) -> Result<Vec<Item>, SyntaxError> {
     Ok(tokenize(text, file, 0, 1)?
         .into_iter()
