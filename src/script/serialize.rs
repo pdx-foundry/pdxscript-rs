@@ -30,6 +30,7 @@ pub fn scalar_text(value: &Scalar) -> Result<String, SyntaxError> {
 enum Write<'a> {
     Item(&'a Item, usize),
     Body(&'a Container, usize),
+    ScalarBody(&'a [Item]),
     Text(String),
     Region(&'a str, bool, &'a [Item], usize),
 }
@@ -114,23 +115,23 @@ fn schedule_item<'a>(
     Ok(())
 }
 
-fn scalar_body_text(items: &[Item]) -> Result<Option<String>, SyntaxError> {
-    let scalars: Option<Vec<_>> = items
-        .iter()
-        .map(|item| match &item.kind {
-            ItemKind::Scalar(value) => Some(value),
-            _ => None,
-        })
-        .collect();
-    let Some(scalars) = scalars else {
-        return Ok(None);
-    };
+fn append_scalar_body(output: &mut String, items: &[Item]) -> Result<(), SyntaxError> {
+    output.push_str("{ ");
 
-    let values = scalars
-        .into_iter()
-        .map(scalar_text)
-        .collect::<Result<Vec<_>, _>>()?;
-    Ok(Some(format!("{{ {} }}", values.join(" "))))
+    for (index, item) in items.iter().enumerate() {
+        let ItemKind::Scalar(value) = &item.kind else {
+            return Err(invalid("Expected a scalar in an inline container"));
+        };
+
+        if index != 0 {
+            output.push(' ');
+        }
+
+        output.push_str(&scalar_text(value)?);
+    }
+
+    output.push_str(" }");
+    Ok(())
 }
 
 fn schedule_body<'a>(
@@ -149,8 +150,8 @@ fn schedule_body<'a>(
 
     if body.items.is_empty() {
         stack.push(Write::Text("{}".into()));
-    } else if let Some(text) = scalar_body_text(&body.items)? {
-        stack.push(Write::Text(text));
+    } else if body.items.iter().all(is_scalar) {
+        stack.push(Write::ScalarBody(&body.items));
     } else {
         stack.push(Write::Text(format!("\n{}}}", "\t".repeat(depth))));
         schedule_items(stack, &body.items, depth + 1, "\n");
@@ -195,6 +196,7 @@ pub fn serialize(items: &[Item]) -> Result<String, SyntaxError> {
     while let Some(action) = stack.pop() {
         match action {
             Write::Text(text) => output.push_str(&text),
+            Write::ScalarBody(items) => append_scalar_body(&mut output, items)?,
             Write::Item(item, depth) => schedule_item(&mut stack, item, depth)?,
             Write::Body(body, depth) => schedule_body(&mut stack, body, depth)?,
             Write::Region(name, negated, items, depth) => {

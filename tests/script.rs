@@ -91,6 +91,49 @@ fn exact_numerals_and_checked_construction() {
     );
 }
 #[test]
+fn large_scalar_lists_keep_canonical_output() {
+    let count = 100_000;
+    let items = [list("values", vec![boolean(true); count]).unwrap()];
+    let written = serialize(&items).unwrap();
+    let expected = format!("values = {{ {}yes }}\n", "yes ".repeat(count - 1));
+
+    assert_eq!(written, expected);
+}
+
+#[test]
+fn scalar_containers_keep_headers_quoting_and_validation() {
+    let body = container(
+        vec![
+            Item::new(ItemKind::Scalar(quoted("two words").unwrap())),
+            Item::new(ItemKind::Scalar(numeral("000.1200").unwrap())),
+            Item::new(ItemKind::Scalar(var_ref("@value").unwrap())),
+            Item::new(ItemKind::Scalar(inline_math("@[ 1 + 2 ]").unwrap())),
+        ],
+        Some("header".into()),
+    )
+    .unwrap();
+    let item = kv("values", Value::Container(body)).unwrap();
+
+    assert_eq!(
+        serialize(&[item]).unwrap(),
+        "values = header { \"two words\" 0.12 @value @[ 1 + 2 ] }\n"
+    );
+
+    let invalid_item = list(
+        "values",
+        vec![
+            boolean(true),
+            Scalar::Number {
+                lexeme: "01".into(),
+            },
+        ],
+    )
+    .unwrap();
+
+    assert!(serialize(&[invalid_item]).is_err());
+}
+
+#[test]
 fn region_fallback_keeps_text_and_comments() {
     let doc = parse("[[P] #keep\n x = { ]", "r").unwrap();
     assert!(matches!(&doc.items[0].kind,ItemKind::ParamText{text,..} if text == " #keep\n x = { "));
