@@ -1,9 +1,10 @@
 //! Owned syntax trees built from the tape.
 use super::{
-    tape::{Lex, Lexer, Tape, TokenKind, line_span, parse_tape},
+    tape::{Lex, Lexer, Tape, Token, TokenKind, line_span, newlines, parse_tape},
     *,
 };
 use crate::{Span, SyntaxError, source::error};
+use std::ops::Range;
 
 /// Parses decoded game-definition source. Repairs are returned explicitly; syntax/resource errors fail.
 pub fn parse(source: &str, file: &str) -> Result<Document, SyntaxError> {
@@ -11,8 +12,8 @@ pub fn parse(source: &str, file: &str) -> Result<Document, SyntaxError> {
     Ok(build(&tape, file))
 }
 
-/// Counts lines by moving from the previous offset, so cost follows the distance moved: tokens move
-/// forward, and repairs move forward except for unclosed bodies, which move back once each.
+/// Counts lines for repair spans by moving from the previous offset, so cost follows the distance
+/// moved: repairs move forward except for unclosed bodies, which move back once each.
 struct Lines<'a> {
     bytes: &'a [u8],
     offset: usize,
@@ -27,7 +28,6 @@ impl<'a> Lines<'a> {
         }
     }
     fn at(&mut self, offset: usize) -> usize {
-        let newlines = |bytes: &[u8]| bytes.iter().filter(|&&b| b == b'\n').count();
         if offset < self.offset {
             self.line -= newlines(&self.bytes[offset..self.offset]);
         } else {
@@ -44,6 +44,32 @@ impl<'a> Lines<'a> {
             end_line: self.at(end),
         }
     }
+}
+
+/// A span from a start line and the byte range. Only quoted strings, inline math, and regions can
+/// contain a newline, so only they count their own bytes for the end line.
+fn span_from(source: &str, range: Range<usize>, line: usize, multiline: bool) -> Span {
+    let end_line = if multiline {
+        line + newlines(&source.as_bytes()[range.clone()])
+    } else {
+        line
+    };
+    Span {
+        start: range.start,
+        end: range.end,
+        line,
+        end_line,
+    }
+}
+fn token_span(source: &str, token: &Token) -> Span {
+    let multiline = matches!(
+        token.kind(),
+        TokenKind::Quoted
+            | TokenKind::Math
+            | TokenKind::RegionText { .. }
+            | TokenKind::Key { quoted: true, .. }
+    );
+    span_from(source, token.span(), token.line(), multiline)
 }
 
 enum Body {
@@ -73,15 +99,52 @@ fn scalar(kind: TokenKind, text: &str) -> Scalar {
     }
 }
 
+/// Number of items in each body, in the order bodies open on the tape (the document first).
+fn body_sizes(tape: &Tape<'_>) -> Vec<usize> {
+    let mut sizes = vec![0];
+    let mut open = vec![0];
+    let mut keyed = false;
+    for token in tape.tokens() {
+        let starts_item = !std::mem::replace(&mut keyed, false);
+        match token.kind() {
+            TokenKind::Key { .. } => {
+                sizes[*open.last().expect("body")] += 1;
+                keyed = true;
+            }
+            TokenKind::Header => keyed = true,
+            TokenKind::Open { .. } | TokenKind::Region { .. } => {
+                if starts_item {
+                    sizes[*open.last().expect("body")] += 1;
+                }
+                open.push(sizes.len());
+                sizes.push(0);
+            }
+            TokenKind::Close { .. } | TokenKind::RegionEnd { .. } => {
+                open.pop();
+            }
+            TokenKind::Bare
+            | TokenKind::Quoted
+            | TokenKind::Math
+            | TokenKind::RegionText { .. } => {
+                if starts_item {
+                    sizes[*open.last().expect("body")] += 1;
+                }
+            }
+        }
+    }
+    sizes
+}
+
 /// Builds the owned tree: owns text, classifies scalars, and attaches line numbers.
 fn build(tape: &Tape<'_>, file: &str) -> Document {
-    let mut lines = Lines::new(tape.source());
-    let mut stack = vec![(Body::Root, Vec::new())];
+    // Each body's vector is allocated once at its final size, counted in a cheap first pass.
+    let sizes = body_sizes(tape);
+    let mut next_body = 1;
+    let mut stack = vec![(Body::Root, Vec::with_capacity(sizes[0]))];
     let mut key: Option<(String, Operator, Span)> = None;
     let mut header = None;
     for token in tape.tokens() {
-        let range = token.span();
-        let span = lines.span(range.start, range.end);
+        let span = token_span(tape.source(), token);
         let text = tape.text(token);
         match token.kind() {
             TokenKind::Key { op, .. } => key = Some((text.into(), op, span)),
@@ -114,7 +177,8 @@ fn build(tape: &Tape<'_>, file: &str) -> Document {
                     header: header.take(),
                     span,
                 };
-                stack.push((body, Vec::new()));
+                stack.push((body, Vec::with_capacity(sizes[next_body])));
+                next_body += 1;
             }
             TokenKind::Close { .. } => {
                 let (
@@ -148,7 +212,8 @@ fn build(tape: &Tape<'_>, file: &str) -> Document {
                     negated,
                     span,
                 };
-                stack.push((body, Vec::new()));
+                stack.push((body, Vec::with_capacity(sizes[next_body])));
+                next_body += 1;
             }
             TokenKind::RegionEnd { .. } => {
                 let (
@@ -182,6 +247,7 @@ fn build(tape: &Tape<'_>, file: &str) -> Document {
         }
     }
     let (_, items) = stack.pop().expect("root");
+    let mut lines = Lines::new(tape.source());
     let diagnostics = tape
         .diagnostics()
         .iter()
@@ -216,8 +282,7 @@ fn build(tape: &Tape<'_>, file: &str) -> Document {
 /// Braces and operators are omitted; brace relationships are not inferred.
 /// Returns an error if tokenization fails.
 pub fn region_items(text: &str, file: &str) -> Result<Vec<Item>, SyntaxError> {
-    let mut lexer = Lexer::new(text, 0);
-    let mut lines = Lines::new(text);
+    let mut lexer = Lexer::new(text, 0, 1);
     let mut items = Vec::new();
     loop {
         let lexeme = match lexer.next() {
@@ -243,7 +308,12 @@ pub fn region_items(text: &str, file: &str) -> Result<Vec<Item>, SyntaxError> {
             _ => continue,
         };
         items.push(Item {
-            span: Some(lines.span(lexeme.start, lexeme.end)),
+            span: Some(span_from(
+                text,
+                lexeme.start..lexeme.end,
+                lexeme.line,
+                matches!(lexeme.kind, Lex::Quoted | Lex::Math | Lex::Region { .. }),
+            )),
             kind,
         });
     }
