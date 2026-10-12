@@ -13,6 +13,12 @@ let canonical = serialize(&document.items)?;
 # Ok::<(), pdxscript::SyntaxError>(())
 ```
 
+Script parsing has two layers. `parse_tape` is the parser: it makes every grammar decision, repair,
+region fallback, and error, and returns a flat borrowed `Tape` of byte-range tokens (keys, scalars,
+headers, linked braces, and regions) with no owned strings, scalar classification, or line numbers.
+`parse` builds the owned `Document` from that tape. Both report identical repairs and errors; use the
+tape when a consumer needs speed more than an owned tree.
+
 `script` provides owned syntax trees, checked constructors, canonical serialization, traversal,
 conditional-region readers, and textual numeral helpers. Repairs (stray closing braces, missing
 closing braces, and documented missing-assignment cases) are returned as diagnostics. Other syntax
@@ -62,6 +68,13 @@ cargo clippy --all-targets --locked -- -D warnings
 cargo build --example conformance --locked
 PDX_SDK_PATH=/path/to/pdx-sdk node tools/typescript-conformance.mjs
 STELLARIS_PATH=/path/to/Stellaris PDX_SDK_PATH=/path/to/pdx-sdk node tools/typescript-conformance.mjs --vanilla
+```
+
+`tools/jomini-bench` is a separate development-only package that times `parse_tape`, `parse`, and
+jomini's `TextTape` over an installed game's `common/` and `events/` scripts:
+
+```
+cd tools/jomini-bench && STELLARIS_PATH=/path/to/Stellaris cargo run --release
 ```
 
 The game-free suite includes 98 frozen TypeScript grammar inputs, Rust API tests, and generated

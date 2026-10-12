@@ -105,24 +105,21 @@ impl<'a> Scanner<'a> {
     }
     pub fn quoted(&mut self, file: &str) -> Result<String, SyntaxError> {
         let start = self.mark();
-        let end = quoted_end(self.text, self.offset)
+        let end = quoted_end(self.text.as_bytes(), self.offset)
             .ok_or_else(|| error(file, start, "Unterminated quoted string"))?;
         let value = self.text[self.offset + 1..end].to_owned();
         self.advance(end + 1 - self.offset);
         Ok(value)
     }
 }
-pub(crate) fn quoted_end(text: &str, open: usize) -> Option<usize> {
-    let mut escaped = false;
-    for (offset, ch) in text[open + 1..].char_indices() {
-        if escaped {
-            escaped = false;
-            continue;
-        }
-        if ch == '\\' {
-            escaped = true;
-        } else if ch == '"' {
-            return Some(open + 1 + offset);
+/// Index of the quote closing the string opened at `open`; a backslash skips the next character.
+pub(crate) fn quoted_end(bytes: &[u8], open: usize) -> Option<usize> {
+    let mut index = open + 1;
+    while index < bytes.len() {
+        match bytes[index] {
+            b'\\' => index += 2,
+            b'"' => return Some(index),
+            _ => index += 1,
         }
     }
     None
@@ -137,9 +134,6 @@ impl<T> Cursor<T> {
     }
     pub fn peek(&self) -> Option<&T> {
         self.tokens.get(self.index)
-    }
-    pub fn nth(&self, n: usize) -> Option<&T> {
-        self.tokens.get(self.index + n)
     }
 }
 impl<T: Clone> Cursor<T> {
