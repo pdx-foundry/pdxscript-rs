@@ -32,14 +32,12 @@ pub fn is_bare_key(text: &str) -> bool {
 }
 /// Whether text is a supported decimal numeral, without an exponent.
 pub fn is_numeral(text: &str) -> bool {
-    let text = text.strip_prefix(['+', '-']).unwrap_or(text);
-    let (whole, fraction) = text
-        .split_once('.')
-        .map_or((text, None), |(w, f)| (w, Some(f)));
-    let digits = |s: &str| !s.is_empty() && s.bytes().all(|b| b.is_ascii_digit());
-    match fraction {
-        Some(f) => (whole.is_empty() || digits(whole)) && digits(f),
-        None => digits(whole),
+    let digits = text.strip_prefix(['+', '-']).unwrap_or(text).as_bytes();
+    let whole = digits.iter().take_while(|b| b.is_ascii_digit()).count();
+    match &digits[whole..] {
+        [] => whole > 0,
+        [b'.', fraction @ ..] => !fraction.is_empty() && fraction.iter().all(u8::is_ascii_digit),
+        _ => false,
     }
 }
 /// Canonicalizes numeral digits textually, preserving arbitrary precision.
@@ -47,22 +45,26 @@ pub fn canonical_numeral(text: &str) -> Result<String, SyntaxError> {
     if !is_numeral(text) {
         return Err(invalid("Invalid numeral"));
     }
-    let negative = text.starts_with('-');
+    Ok(canonical_digits(text))
+}
+/// Canonical spelling of a text already known to be a numeral, built in one allocation.
+fn canonical_digits(text: &str) -> String {
     let unsigned = text.trim_start_matches(['+', '-']);
     let (whole, fraction) = unsigned.split_once('.').unwrap_or((unsigned, ""));
     let whole = whole.trim_start_matches('0');
     let whole = if whole.is_empty() { "0" } else { whole };
     let fraction = fraction.trim_end_matches('0');
-    let magnitude = if fraction.is_empty() {
-        whole.to_owned()
-    } else {
-        format!("{whole}.{fraction}")
-    };
-    Ok(if negative && magnitude != "0" {
-        format!("-{magnitude}")
-    } else {
-        magnitude
-    })
+    let negative = text.starts_with('-') && (whole != "0" || !fraction.is_empty());
+    let mut lexeme = String::with_capacity(2 + whole.len() + fraction.len());
+    if negative {
+        lexeme.push('-');
+    }
+    lexeme.push_str(whole);
+    if !fraction.is_empty() {
+        lexeme.push('.');
+        lexeme.push_str(fraction);
+    }
+    lexeme
 }
 /// Writes a finite double as decimal digits; integral doubles use their exact integer value.
 pub fn decimal_lexeme(value: f64) -> Result<String, SyntaxError> {
@@ -104,8 +106,10 @@ pub fn classify_unquoted(text: &str) -> Scalar {
         Scalar::Bool {
             value: text == "yes",
         }
-    } else if let Ok(lexeme) = canonical_numeral(text) {
-        Scalar::Number { lexeme }
+    } else if is_numeral(text) {
+        Scalar::Number {
+            lexeme: canonical_digits(text),
+        }
     } else if text.starts_with('@') {
         Scalar::Variable { name: text.into() }
     } else {

@@ -64,15 +64,23 @@ pub struct Token {
     kind: TokenKind,
     start: usize,
     end: usize,
+    line: usize,
 }
 impl Token {
     /// Event kind.
+    #[inline]
     pub fn kind(&self) -> TokenKind {
         self.kind
     }
     /// Half-open UTF-8 byte range in the original source, including any leading BOM.
+    #[inline]
     pub fn span(&self) -> Range<usize> {
         self.start..self.end
+    }
+    /// One-based line of the token's first byte.
+    #[inline]
+    pub fn line(&self) -> usize {
+        self.line
     }
 }
 
@@ -95,19 +103,23 @@ pub struct Tape<'a> {
 }
 impl<'a> Tape<'a> {
     /// Source the spans index into.
+    #[inline]
     pub fn source(&self) -> &'a str {
         self.source
     }
     /// Events in source order.
+    #[inline]
     pub fn tokens(&self) -> &[Token] {
         &self.tokens
     }
     /// Repairs in the order they were applied.
+    #[inline]
     pub fn diagnostics(&self) -> &[TapeDiagnostic] {
         &self.diagnostics
     }
     /// Text of a key, header, or scalar without quotes; for regions, the parameter name without `!`.
     /// Other tokens return their source text.
+    #[inline]
     pub fn text(&self, token: &Token) -> &'a str {
         let (start, end) = (token.start, token.end);
         match token.kind {
@@ -143,7 +155,7 @@ pub fn parse_tape<'a>(source: &'a str, file: &str) -> Result<Tape<'a>, SyntaxErr
         file,
         tokens: Vec::with_capacity(source.len() / 6),
         diagnostics: Vec::new(),
-        levels: vec![Level::new(Lexer::new(source, start), None)],
+        levels: vec![Level::new(Lexer::new(source, start, 1), None)],
         containers: Vec::new(),
     };
     parser.run()?;
@@ -188,11 +200,14 @@ pub(crate) struct Lexeme {
     pub kind: Lex,
     pub start: usize,
     pub end: usize,
+    /// One-based line of `start`.
+    pub line: usize,
 }
 const EMPTY: Lexeme = Lexeme {
     kind: Lex::Bracket,
     start: 0,
     end: 0,
+    line: 0,
 };
 /// A lexical failure: message at a token start.
 #[derive(Clone, Copy, Debug)]
@@ -201,25 +216,32 @@ pub(crate) struct LexError {
     pub message: &'static str,
 }
 
-/// Byte lexer bounded to one level: the whole document, or one region body.
+/// Byte lexer bounded to one level: the whole document, or one region body. It counts lines as it
+/// skips whitespace, which is cheaper than any later pass over the same bytes.
+#[derive(Clone, Copy)]
 pub(crate) struct Lexer<'a> {
     text: &'a str,
     pos: usize,
+    line: usize,
 }
 impl<'a> Lexer<'a> {
-    pub fn new(text: &'a str, pos: usize) -> Self {
-        Self { text, pos }
+    /// A lexer at `pos`, which is on one-based `line`.
+    pub fn new(text: &'a str, pos: usize, line: usize) -> Self {
+        Self { text, pos, line }
     }
     #[inline(always)]
     pub fn next(&mut self) -> Result<Option<Lexeme>, LexError> {
         let bytes = self.text.as_bytes();
         let mut pos = self.pos;
+        let mut line = self.line;
         let first = loop {
             let Some(&byte) = bytes.get(pos) else {
                 self.pos = pos;
+                self.line = line;
                 return Ok(None);
             };
             if CLASS[byte as usize] & SPACE != 0 {
+                line += usize::from(byte == b'\n');
                 pos += 1;
             } else if byte == b'#' {
                 pos = bytes[pos..]
@@ -282,8 +304,20 @@ impl<'a> Lexer<'a> {
             }
         };
         self.pos = end;
-        Ok(Some(Lexeme { kind, start, end }))
+        self.line = match kind {
+            Lex::Quoted | Lex::Math | Lex::Region { .. } => line + newlines(&bytes[start..end]),
+            _ => line,
+        };
+        Ok(Some(Lexeme {
+            kind,
+            start,
+            end,
+            line,
+        }))
     }
+}
+pub(crate) fn newlines(bytes: &[u8]) -> usize {
+    bytes.iter().filter(|&&b| b == b'\n').count()
 }
 /// Length of the word at the start of `bytes`: the index of the first terminator.
 #[inline]
@@ -379,14 +413,17 @@ impl<'a> Level<'a> {
         if self.replay_len > 0 {
             return Ok(Some(self.replay[self.replay_start]));
         }
-        Lexer::new(self.lexer.text, self.lexer.pos).next()
+        {
+            let mut lexer = self.lexer;
+            lexer.next()
+        }
     }
     /// First lexical error in the not-yet-lexed remainder of this level.
     fn remaining_error(&mut self) -> Option<LexError> {
         if self.clean_remainder {
             return None;
         }
-        let mut lexer = Lexer::new(self.lexer.text, self.lexer.pos);
+        let mut lexer = self.lexer;
         loop {
             match lexer.next() {
                 Ok(Some(_)) => {}
@@ -488,13 +525,13 @@ impl<'a> Parser<'a, '_> {
                                 self.open(Some(key), Some(value), first, open)?;
                             }
                             next => {
-                                self.push(key, first.start, first.end);
+                                self.push(key, first.start, first.end, first.line);
                                 self.scalar(value);
                                 carry = next;
                             }
                         },
                         Lex::Quoted | Lex::Math => {
-                            self.push(key, first.start, first.end);
+                            self.push(key, first.start, first.end, first.line);
                             self.scalar(value);
                         }
                         _ => {
@@ -552,7 +589,12 @@ impl<'a> Parser<'a, '_> {
             Lex::Open => self.open(None, None, token, token)?,
             Lex::Close if self.containers.len() > self.level_containers() => {
                 let open = self.containers.pop().expect("container").tape;
-                let close = self.push(TokenKind::Close { open }, token.start, token.end);
+                let close = self.push(
+                    TokenKind::Close { open },
+                    token.start,
+                    token.end,
+                    token.line,
+                );
                 self.tokens[open].kind = TokenKind::Open { close };
             }
             Lex::Close => self.diagnostics.push(TapeDiagnostic {
@@ -574,21 +616,31 @@ impl<'a> Parser<'a, '_> {
         if self.depth() >= MAX_NESTING_DEPTH {
             return Err(Failure::Nesting(token.start..token.end));
         }
-        let tape = self.push(TokenKind::Region { negated, end: 0 }, token.start, body);
+        let tape = self.push(
+            TokenKind::Region { negated, end: 0 },
+            token.start,
+            body,
+            token.line,
+        );
         let mark = RegionMark {
             lexeme: token,
             tape,
             diagnostics: self.diagnostics.len(),
             containers: self.containers.len(),
         };
-        let lexer = Lexer::new(&self.source[..token.end - 1], body);
+        let lexer = Lexer::new(&self.source[..token.end - 1], body, token.line);
         self.levels.push(Level::new(lexer, Some(mark)));
         Ok(())
     }
 
     #[inline(always)]
-    fn push(&mut self, kind: TokenKind, start: usize, end: usize) -> usize {
-        self.tokens.push(Token { kind, start, end });
+    fn push(&mut self, kind: TokenKind, start: usize, end: usize, line: usize) -> usize {
+        self.tokens.push(Token {
+            kind,
+            start,
+            end,
+            line,
+        });
         self.tokens.len() - 1
     }
     #[inline(always)]
@@ -598,7 +650,7 @@ impl<'a> Parser<'a, '_> {
             Lex::Math => TokenKind::Math,
             _ => TokenKind::Bare,
         };
-        self.push(kind, token.start, token.end);
+        self.push(kind, token.start, token.end, token.line);
     }
     fn level(&mut self) -> &mut Level<'a> {
         self.levels.last_mut().expect("level")
@@ -633,15 +685,20 @@ impl<'a> Parser<'a, '_> {
         }
         let span = match key {
             Some(key) => {
-                self.push(key, key_token.start, key_token.end);
+                self.push(key, key_token.start, key_token.end, key_token.line);
                 key_token.start..key_token.end
             }
             None => open.start..open.end,
         };
         if let Some(header) = header {
-            self.push(TokenKind::Header, header.start, header.end);
+            self.push(TokenKind::Header, header.start, header.end, header.line);
         }
-        let tape = self.push(TokenKind::Open { close: 0 }, open.start, open.end);
+        let tape = self.push(
+            TokenKind::Open { close: 0 },
+            open.start,
+            open.end,
+            open.line,
+        );
         self.containers.push(OpenContainer { tape, span });
         Ok(())
     }
@@ -669,8 +726,8 @@ impl<'a> Parser<'a, '_> {
                     kind: Repair::UnclosedAtEof,
                     span: open.span,
                 });
-                let end = self.source.len();
-                let close = self.push(TokenKind::Close { open: open.tape }, end, end);
+                let (end, line) = (self.source.len(), self.levels[0].lexer.line);
+                let close = self.push(TokenKind::Close { open: open.tape }, end, end, line);
                 self.tokens[open.tape].kind = TokenKind::Open { close };
             }
             return false;
@@ -689,6 +746,7 @@ impl<'a> Parser<'a, '_> {
                 TokenKind::RegionEnd { start: region.tape },
                 lexeme.end - 1,
                 lexeme.end,
+                level.lexer.line,
             );
             let Lex::Region { negated, .. } = lexeme.kind else {
                 unreachable!("region marks hold region openers")
@@ -709,6 +767,7 @@ impl<'a> Parser<'a, '_> {
             TokenKind::RegionText { negated },
             region.lexeme.start,
             region.lexeme.end,
+            region.lexeme.line,
         );
     }
 
