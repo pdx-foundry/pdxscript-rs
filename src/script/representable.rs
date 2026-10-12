@@ -1,7 +1,7 @@
 use super::{Scalar, ast::invalid};
 use crate::SyntaxError;
 
-pub(crate) fn terminates(ch: char) -> bool {
+pub(crate) const fn terminates(ch: char) -> bool {
     matches!(
         ch,
         ' ' | '\t'
